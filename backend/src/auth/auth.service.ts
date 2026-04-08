@@ -5,12 +5,14 @@ import { hash, compare } from 'bcryptjs';
 import type { AuthResponse, LoginInput, SignupInput } from '@accessibility-platform/contracts';
 
 import { UsersService } from '../users/users.service';
+import { JwtKeyService } from './jwt-key.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
+    private readonly jwtKeyService: JwtKeyService,
   ) {}
 
   async signup(input: SignupInput): Promise<AuthResponse> {
@@ -50,7 +52,7 @@ export class AuthService {
     const accessToken = await this.jwtService.signAsync({
       sub: user.id,
       email: user.email,
-    });
+    }, this.jwtKeyService.signOptions);
 
     return {
       accessToken,

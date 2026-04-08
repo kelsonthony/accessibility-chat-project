@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { JwtModule } from '@nestjs/jwt';
 
 import { AuthModule } from './auth/auth.module';
 import { HealthModule } from './common/health/health.module';
@@ -12,11 +11,6 @@ import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
-    JwtModule.register({
-      global: true,
-      secret: process.env.JWT_SECRET || 'change-me',
-      signOptions: { expiresIn: '1h' },
-    }),
     DatabaseModule,
     AuthModule,
     HealthModule,
