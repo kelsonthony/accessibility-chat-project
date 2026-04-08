@@ -1,0 +1,17 @@
+{
+  "name": "accessibility-chat-project",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "backend",
+    "frontend",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:backend": "npm run dev --workspace @handtalk-challenge/backend",
+    "dev:frontend": "npm run dev --workspace @handtalk-challenge/frontend",
+    "build": "npm run build --workspaces",
+    "lint": "npm run lint --workspaces",
+    "test": "npm run test --workspaces"
+  }
+}

@@ -1,0 +1,11 @@
+node_modules
+.next
+dist
+coverage
+.env
+.env.local
+.oracle-cloud-tunnels.pid
+.oracle-cloud-tunnels.sock
+.oracle-cloud-tunnels.log
+*.tsbuildinfo
+

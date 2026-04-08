@@ -1,0 +1,141 @@
+{
+  "info": {
+    "name": "Access Chat Local",
+    "_postman_id": "3a5bb674-53af-4fcb-84ed-cf469d21f071",
+    "description": "Collection for the local Access Chat stack running at localhost with the backend connected to accesschatdb through the Oracle SSH tunnel.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://127.0.0.1:3001" },
+    { "key": "frontendUrl", "value": "http://127.0.0.1:3000" },
+    { "key": "email", "value": "postman@accesschat.dev" },
+    { "key": "password", "value": "StrongPass123" },
+    { "key": "token", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Frontend Home",
+      "request": {
+        "method": "GET",
+        "url": { "raw": "{{frontendUrl}}", "host": ["{{frontendUrl}}"] }
+      }
+    },
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] }
+      }
+    },
+    {
+      "name": "Signup",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const body = pm.response.json();",
+              "if (body.accessToken) { pm.collectionVariables.set('token', body.accessToken); }"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"displayName\": \"Postman Access Chat\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/signup", "host": ["{{baseUrl}}"], "path": ["signup"] }
+      }
+    },
+    {
+      "name": "Login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const body = pm.response.json();",
+              "if (body.accessToken) { pm.collectionVariables.set('token', body.accessToken); }"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/login", "host": ["{{baseUrl}}"], "path": ["login"] }
+      }
+    },
+    {
+      "name": "Sync Sources",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": { "raw": "{{baseUrl}}/sources/sync", "host": ["{{baseUrl}}"], "path": ["sources", "sync"] }
+      }
+    },
+    {
+      "name": "Ingest Chunks",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": { "raw": "{{baseUrl}}/ingest", "host": ["{{baseUrl}}"], "path": ["ingest"] }
+      }
+    },
+    {
+      "name": "List Documents",
+      "request": {
+        "method": "GET",
+        "url": { "raw": "{{baseUrl}}/documents", "host": ["{{baseUrl}}"], "path": ["documents"] }
+      }
+    },
+    {
+      "name": "Ask Question",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"question\": \"Quais requisitos da LBI devo observar no Brasil para acessibilidade?\",\n  \"language\": \"pt\",\n  \"jurisdictions\": [\"BR\", \"GLOBAL\"]\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/ask", "host": ["{{baseUrl}}"], "path": ["ask"] }
+      }
+    },
+    {
+      "name": "Collect Telemetry",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"events\": [\n    {\n      \"sessionId\": \"session-postman-1\",\n      \"eventType\": \"message_sent\",\n      \"timestamp\": \"2026-04-08T13:50:00Z\",\n      \"metadata\": {\n        \"route\": \"/chat\",\n        \"language\": \"pt\",\n        \"inputLength\": 87\n      }\n    },\n    {\n      \"sessionId\": \"session-postman-1\",\n      \"eventType\": \"answer_received\",\n      \"timestamp\": \"2026-04-08T13:50:02Z\",\n      \"metadata\": {\n        \"route\": \"/chat\",\n        \"mode\": \"rag\",\n        \"sources\": 1\n      }\n    }\n  ]\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/collect", "host": ["{{baseUrl}}"], "path": ["collect"] }
+      }
+    },
+    {
+      "name": "Get Telemetry Data",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": { "raw": "{{baseUrl}}/data", "host": ["{{baseUrl}}"], "path": ["data"] }
+      }
+    }
+  ]
+}
+
