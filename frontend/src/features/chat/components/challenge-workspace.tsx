@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, useTransition } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type {
   AskQuestionResponse,
@@ -26,48 +26,64 @@ type Message = {
   content: string;
 };
 
+type Conversation = {
+  id: string;
+  title: string;
+  messages: Message[];
+  updatedAt: string;
+};
+
 const copy = {
   pt: {
-    eyebrow: 'Hand Talk Challenge',
-    title: 'Telemetria forte. Chat útil. RAG pronto para crescer.',
-    description:
-      'A interface agora segue o escopo do desafio: autenticação, chat protegido, batching de telemetria e fallback operacional enquanto a ingestão oficial evolui.',
-    placeholder: 'Pergunte sobre WCAG, LBI, ADA, Section 508 ou EN 301 549...',
-    send: 'Enviar pergunta',
-    chatTitle: 'Chat accessibility assistant',
+    placeholder: 'Pergunte sobre WCAG, LBI, ADA ou Section 508...',
+    send: 'Enviar',
+    empty: 'No que você está pensando hoje?',
   },
   en: {
-    eyebrow: 'Hand Talk Challenge',
-    title: 'Strong telemetry. Useful chat. RAG ready to grow.',
-    description:
-      'The interface now follows the challenge scope: authentication, protected chat, telemetry batching, and an operational fallback while official ingestion evolves.',
     placeholder: 'Ask about WCAG, ADA, Section 508, LBI, or EN 301 549...',
-    send: 'Send question',
-    chatTitle: 'Chat accessibility assistant',
+    send: 'Send',
+    empty: 'How can I help you today with accessibility content?',
   },
   es: {
-    eyebrow: 'Hand Talk Challenge',
-    title: 'Telemetría fuerte. Chat útil. RAG listo para crecer.',
-    description:
-      'La interfaz ahora sigue el alcance del desafío: autenticación, chat protegido, batching de telemetría y fallback operativo mientras evoluciona la ingestión oficial.',
     placeholder: 'Pregunta sobre WCAG, ADA, Section 508, LBI o EN 301 549...',
-    send: 'Enviar pregunta',
-    chatTitle: 'Asistente de accesibilidad',
+    send: 'Enviar',
+    empty: '¿Cómo puedo ayudarte hoy con contenido de accesibilidad?',
   },
 } as const;
 
 const defaultPrompts: Record<SupportedLanguage, string> = {
-  pt: 'Quais critérios devo priorizar para um checkout acessível por teclado no Brasil?',
-  en: 'Which accessibility criteria should I prioritize for a keyboard-friendly checkout in the US?',
-  es: '¿Qué criterios debo priorizar para un checkout accesible por teclado en la Unión Europea?',
+  pt: 'Quais requisitos da LBI devo observar no Brasil para acessibilidade?',
+  en: 'Which accessibility criteria should I prioritize for a keyboard-friendly checkout?',
+  es: '¿Qué criterios debo priorizar para un checkout accesible por teclado?',
 };
 
 const storageKey = 'handtalk-auth';
+const conversationsStorageKey = 'handtalk-conversations';
+const activeConversationStorageKey = 'handtalk-active-conversation';
+const historyOpenStorageKey = 'handtalk-history-open';
+const languageStorageKey = 'handtalk-language';
+const minimumReplyDelayMs = 700;
+const initialConversation: Conversation = {
+  id: 'initial-conversation',
+  title: 'Nova conversa',
+  messages: [],
+  updatedAt: '',
+};
+
+function createBlankConversation(): Conversation {
+  return {
+    id: crypto.randomUUID(),
+    title: 'Nova conversa',
+    messages: [],
+    updatedAt: new Date().toISOString(),
+  };
+}
 
 export function ChallengeWorkspace() {
   const [language, setLanguage] = useState<SupportedLanguage>('pt');
-  const [question, setQuestion] = useState(defaultPrompts.pt);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [question, setQuestion] = useState('');
+  const [conversations, setConversations] = useState<Conversation[]>([initialConversation]);
+  const [activeConversationId, setActiveConversationId] = useState<string>('');
   const [auth, setAuth] = useState<AuthResponse | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [chatError, setChatError] = useState<string | null>(null);
@@ -75,14 +91,22 @@ export function ChallengeWorkspace() {
   const [opsMessage, setOpsMessage] = useState<string | null>(null);
   const [telemetryItems, setTelemetryItems] = useState<TelemetryDataItem[]>([]);
   const [telemetryTotal, setTelemetryTotal] = useState(0);
-  const [isPending, startTransition] = useTransition();
-  const sessionId = useMemo(() => crypto.randomUUID(), []);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [isAsking, setIsAsking] = useState(false);
+  const [sessionId, setSessionId] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const telemetry = useTelemetryBatch({
     token: auth?.accessToken || null,
     sessionId,
     language,
   });
+
+  useEffect(() => {
+    setSessionId(crypto.randomUUID());
+  }, []);
 
   useEffect(() => {
     const raw = window.localStorage.getItem(storageKey);
@@ -98,6 +122,60 @@ export function ChallengeWorkspace() {
   }, []);
 
   useEffect(() => {
+    const savedConversations = window.localStorage.getItem(conversationsStorageKey);
+    const savedActiveConversation = window.localStorage.getItem(activeConversationStorageKey);
+    const savedHistoryOpen = window.localStorage.getItem(historyOpenStorageKey);
+    const savedLanguage = window.localStorage.getItem(languageStorageKey);
+
+    if (savedConversations) {
+      try {
+        const parsed = JSON.parse(savedConversations) as Conversation[];
+        if (parsed.length > 0) {
+          setConversations(parsed);
+        }
+      } catch {
+        window.localStorage.removeItem(conversationsStorageKey);
+      }
+    }
+
+    if (savedActiveConversation) {
+      setActiveConversationId(savedActiveConversation);
+    }
+
+    if (savedHistoryOpen) {
+      setHistoryOpen(savedHistoryOpen === 'true');
+    }
+
+    if (savedLanguage === 'pt' || savedLanguage === 'en' || savedLanguage === 'es') {
+      setLanguage(savedLanguage);
+    }
+  }, []);
+
+  useEffect(() => {
+    setActiveConversationId((current) => current || conversations[0]?.id || '');
+  }, [conversations]);
+
+  useEffect(() => {
+    window.localStorage.setItem(conversationsStorageKey, JSON.stringify(conversations));
+  }, [conversations]);
+
+  useEffect(() => {
+    if (!activeConversationId) {
+      return;
+    }
+
+    window.localStorage.setItem(activeConversationStorageKey, activeConversationId);
+  }, [activeConversationId]);
+
+  useEffect(() => {
+    window.localStorage.setItem(historyOpenStorageKey, String(historyOpen));
+  }, [historyOpen]);
+
+  useEffect(() => {
+    window.localStorage.setItem(languageStorageKey, language);
+  }, [language]);
+
+  useEffect(() => {
     telemetry.track('language_changed', { language });
   }, [language, telemetry]);
 
@@ -110,6 +188,20 @@ export function ChallengeWorkspace() {
   }, [auth]);
 
   const activeCopy = copy[language];
+  const activeConversation =
+    conversations.find((conversation) => conversation.id === activeConversationId) || conversations[0];
+  const messages = activeConversation?.messages || [];
+  const hasConversationHistory = conversations.some((conversation) => conversation.messages.length > 0);
+
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      return;
+    }
+
+    textarea.style.height = '0px';
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 240)}px`;
+  }, [question]);
 
   async function handleAuth(input: {
     email: string;
@@ -118,40 +210,97 @@ export function ChallengeWorkspace() {
     mode: 'login' | 'signup';
   }) {
     setAuthError(null);
+    setIsAuthenticating(true);
 
-    startTransition(async () => {
+    try {
+      const response =
+        input.mode === 'signup'
+          ? await signup({
+              email: input.email,
+              password: input.password,
+              displayName: input.displayName || 'Accessibility Analyst',
+            })
+          : await login({
+              email: input.email,
+              password: input.password,
+            });
+
+      setAuth(response);
+      window.localStorage.setItem(storageKey, JSON.stringify(response));
+      telemetry.track(input.mode === 'signup' ? 'signup_succeeded' : 'login_succeeded', {
+        emailDomain: input.email.split('@')[1] || 'unknown',
+      });
+      setOpsMessage('Sessão autenticada.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Authentication failed.';
+      setAuthError(message);
+      telemetry.track(input.mode === 'signup' ? 'signup_failed' : 'login_failed', {
+        reason: message,
+      });
+    } finally {
+      setIsAuthenticating(false);
+    }
+  }
+
+  async function handleSocialAuth(provider: 'google' | 'github') {
+    const credentials = {
+      google: {
+        email: 'google.user@accesschat.dev',
+        password: 'StrongPass123',
+        displayName: 'Google User',
+      },
+      github: {
+        email: 'github.user@accesschat.dev',
+        password: 'StrongPass123',
+        displayName: 'GitHub User',
+      },
+    }[provider];
+
+    setAuthError(null);
+    setIsAuthenticating(true);
+
+    try {
+      let response: AuthResponse;
+
       try {
-        const response =
-          input.mode === 'signup'
-            ? await signup({
-                email: input.email,
-                password: input.password,
-                displayName: input.displayName || 'Accessibility Analyst',
-              })
-            : await login({
-                email: input.email,
-                password: input.password,
-              });
-
-        setAuth(response);
-        window.localStorage.setItem(storageKey, JSON.stringify(response));
-        telemetry.track(input.mode === 'signup' ? 'signup_succeeded' : 'login_succeeded', {
-          emailDomain: input.email.split('@')[1] || 'unknown',
+        response = await login({
+          email: credentials.email,
+          password: credentials.password,
         });
-        setOpsMessage('Authenticated against accesschatdb.');
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Authentication failed.';
-        setAuthError(message);
-        telemetry.track(input.mode === 'signup' ? 'signup_failed' : 'login_failed', {
-          reason: message,
+      } catch {
+        response = await signup({
+          email: credentials.email,
+          password: credentials.password,
+          displayName: credentials.displayName,
         });
       }
-    });
+
+      setAuth(response);
+      window.localStorage.setItem(storageKey, JSON.stringify(response));
+      telemetry.track('login_succeeded', {
+        emailDomain: credentials.email.split('@')[1] || 'unknown',
+        provider,
+      });
+      setOpsMessage(`Sessão autenticada via ${provider === 'google' ? 'Google' : 'GitHub'} em modo demo.`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Social authentication failed.';
+      setAuthError(message);
+      telemetry.track('login_failed', {
+        reason: message,
+        provider,
+      });
+    } finally {
+      setIsAuthenticating(false);
+    }
   }
 
   async function handleAsk() {
     if (!auth) {
       setChatError('Authenticate before sending a question.');
+      return;
+    }
+
+    if (!question.trim() || isAsking) {
       return;
     }
 
@@ -162,36 +311,47 @@ export function ChallengeWorkspace() {
     });
 
     const nextMessages = [...messages, { role: 'user' as const, content: question }];
-    setMessages(nextMessages);
+    const submittedQuestion = question;
+    setQuestion('');
+    updateConversation(activeConversation.id, nextMessages, submittedQuestion);
+    setIsAsking(true);
 
-    startTransition(async () => {
-      try {
-        const response = await askQuestion(auth.accessToken, {
-          question,
-          language,
-          jurisdictions: inferJurisdictions(question),
-        });
+    try {
+      const startedAt = Date.now();
+      const response = await askQuestion(auth.accessToken, {
+        question: submittedQuestion,
+        language,
+        jurisdictions: inferJurisdictions(submittedQuestion),
+      });
 
-        setMessages([
-          ...nextMessages,
-          {
-            role: 'assistant',
-            content: formatAnswer(response),
-          },
-        ]);
+      const elapsed = Date.now() - startedAt;
+      const remainingDelay = minimumReplyDelayMs - elapsed;
 
-        telemetry.track('answer_received', {
-          mode: response.mode,
-          sources: response.sources.length,
-        });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unable to send question.';
-        setChatError(message);
-        telemetry.track('retry_triggered', {
-          reason: message,
-        });
+      if (remainingDelay > 0) {
+        await new Promise((resolve) => setTimeout(resolve, remainingDelay));
       }
-    });
+
+      updateConversation(activeConversation.id, [
+        ...nextMessages,
+        {
+          role: 'assistant',
+          content: formatAnswer(response),
+        },
+      ]);
+
+      telemetry.track('answer_received', {
+        mode: response.mode,
+        sources: response.sources.length,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to send question.';
+      setChatError(message);
+      telemetry.track('retry_triggered', {
+        reason: message,
+      });
+    } finally {
+      setIsAsking(false);
+    }
   }
 
   async function refreshTelemetry(token = auth?.accessToken) {
@@ -254,158 +414,290 @@ export function ChallengeWorkspace() {
   function handleLogout() {
     window.localStorage.removeItem(storageKey);
     setAuth(null);
-    setMessages([]);
+    const blankConversation = createBlankConversation();
+    setConversations([blankConversation]);
+    setActiveConversationId(blankConversation.id);
+    window.localStorage.removeItem(conversationsStorageKey);
+    window.localStorage.removeItem(activeConversationStorageKey);
     setTelemetryItems([]);
     setTelemetryTotal(0);
-    setOpsMessage('Session cleared locally.');
+    setSettingsOpen(false);
+  }
+
+  function handleNewConversation() {
+    const newConversation = createBlankConversation();
+
+    setConversations((current) => [newConversation, ...current]);
+    setActiveConversationId(newConversation.id);
+    setQuestion('');
+    setHistoryOpen(false);
+  }
+
+  function handleLanguageChange(nextLanguage: SupportedLanguage) {
+    setLanguage(nextLanguage);
+    setQuestion((current) =>
+      Object.values(defaultPrompts).includes(current) ? '' : current,
+    );
+  }
+
+  function updateConversation(id: string, nextMessages: Message[], draftTitle?: string) {
+    setConversations((current) =>
+      current.map((conversation) =>
+        conversation.id === id
+          ? {
+              ...conversation,
+              messages: nextMessages,
+              title:
+                conversation.title === 'Nova conversa' && draftTitle
+                  ? draftTitle.slice(0, 48)
+                  : conversation.title,
+              updatedAt: new Date().toISOString(),
+            }
+          : conversation,
+      ),
+    );
+  }
+
+  if (!auth) {
+    return (
+      <main className="minimal-shell">
+        <div className="topbar unauthenticated">
+          <div className="topbar-right">
+            <div className="language-select" role="group" aria-label="Language selector">
+              {(['pt', 'en', 'es'] as const).map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  className="language-button"
+                  aria-pressed={language === option}
+                  onClick={() => handleLanguageChange(option)}
+                >
+                  {option.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <AuthPanel
+          onSubmit={handleAuth}
+          onSocialAuth={handleSocialAuth}
+          isPending={isAuthenticating}
+          error={authError}
+        />
+      </main>
+    );
   }
 
   return (
-    <main className="page-shell">
-      <section className="hero">
-        <span className="eyebrow">{activeCopy.eyebrow}</span>
-        <h1>{activeCopy.title}</h1>
-        <p>{activeCopy.description}</p>
-      </section>
-
-      <section className="workspace-grid">
-        <AuthPanel onSubmit={handleAuth} isPending={isPending} error={authError} />
-
-        <section className="panel chat-panel" aria-labelledby="chat-title">
-          <div className="toolbar">
-            <div>
-              <span className="eyebrow">Protected chat</span>
-              <h2 id="chat-title">{activeCopy.chatTitle}</h2>
-            </div>
-            <div className="toolbar-actions">
-              <div className="segmented-control" role="group" aria-label="Language selector">
-                {(['pt', 'en', 'es'] as const).map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    className="segment"
-                    aria-pressed={language === option}
-                    onClick={() => {
-                      setLanguage(option);
-                      setQuestion(defaultPrompts[option]);
-                    }}
-                  >
-                    {option.toUpperCase()}
-                  </button>
-                ))}
-              </div>
-              {auth ? (
-                <button type="button" className="ghost-button" onClick={handleLogout}>
-                  Logout
-                </button>
-              ) : null}
-            </div>
+    <main className="minimal-shell">
+      <div className="topbar">
+        <div className="topbar-left">
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Open settings"
+            aria-expanded={settingsOpen}
+            onClick={() => setSettingsOpen((value) => !value)}
+          >
+            <span />
+            <span />
+            <span />
+          </button>
+          <button
+            type="button"
+            className="history-toggle"
+            aria-label="Toggle history"
+            aria-expanded={historyOpen}
+            onClick={() => setHistoryOpen((value) => !value)}
+          >
+            Historico
+          </button>
+          <button type="button" className="ghost-button topbar-new-chat" onClick={handleNewConversation}>
+            Novo chat
+          </button>
+        </div>
+        <div className="topbar-right">
+          <div className="language-select" role="group" aria-label="Language selector">
+            {(['pt', 'en', 'es'] as const).map((option) => (
+              <button
+                key={option}
+                type="button"
+                className="language-button"
+                aria-pressed={language === option}
+                onClick={() => handleLanguageChange(option)}
+              >
+                {option.toUpperCase()}
+              </button>
+            ))}
           </div>
+          <button type="button" className="ghost-button topbar-logout" onClick={handleLogout}>
+            Logout
+          </button>
+        </div>
+      </div>
 
-          <div className="conversation" aria-live="polite">
-            {messages.length === 0 ? (
-              <article className="message assistant">
-                Authenticate, send a question, and inspect batched telemetry through `/data`.
-              </article>
-            ) : null}
-
-            {messages.map((message, index) => (
-              <article key={`${message.role}-${index}`} className={`message ${message.role}`}>
-                {message.content}
+      {settingsOpen ? (
+        <aside className="settings-drawer">
+          <div className="settings-section">
+            <strong>Settings</strong>
+          </div>
+          <div className="settings-section">
+            <strong>Remote ops</strong>
+            <button type="button" className="ghost-button" onClick={handleSync}>
+              Sync sources
+            </button>
+            <button type="button" className="ghost-button" onClick={handleIngest}>
+              Ingest chunks
+            </button>
+            <button type="button" className="ghost-button" onClick={handleFlushTelemetry}>
+              Flush telemetry
+            </button>
+            <button type="button" className="ghost-button" onClick={() => void refreshTelemetry()}>
+              Refresh /data
+            </button>
+          </div>
+          <div className="settings-section">
+            <strong>Telemetry</strong>
+            <p className="feedback">Stored events: {telemetryTotal}</p>
+            {telemetryItems.slice(0, 5).map((item) => (
+              <article key={item.id} className="settings-item">
+                <strong>{item.eventType}</strong>
+                <span>{new Date(item.timestamp).toLocaleString()}</span>
               </article>
             ))}
           </div>
-
-          <div className="stack">
-            <label className="field" htmlFor="chat-question">
-              <span>Question</span>
-              <textarea
-                id="chat-question"
-                value={question}
-                placeholder={activeCopy.placeholder}
-                onChange={(event) => {
-                  setQuestion(event.target.value);
-                  telemetry.track('message_edited', { length: event.target.value.length });
-                }}
-              />
-            </label>
-
-            <button type="button" className="primary-button" disabled={isPending} onClick={handleAsk}>
-              {isPending ? 'Sending...' : activeCopy.send}
-            </button>
-
-            {chatError ? (
-              <p className="feedback error" role="alert">
-                {chatError}
-              </p>
-            ) : null}
-          </div>
-        </section>
-
-        <aside className="panel insight-panel">
-          <div className="fact-card">
-            <strong>Telemetry batching</strong>
-            Client-side buffering flushes every 5 seconds, at 20 events, and on page hide.
-          </div>
-          <div className="fact-card">
-            <strong>Current backend mode</strong>
-            JWT auth and chat fallback are live. Ingestion and vector retrieval stay behind the same
-            contracts for the next iteration.
-          </div>
-          <div className="fact-card">
-            <strong>Operational API surface</strong>
-            <code>/signup</code>, <code>/login</code>, <code>/collect</code>, <code>/data</code>,
-            <code>/ask</code>, <code>/sources/sync</code>, and <code>/ingest</code>.
-          </div>
-          <div className="fact-card stack">
-            <strong>Remote ops</strong>
-            <div className="button-row">
-              <button type="button" className="ghost-button" onClick={handleSync} disabled={!auth}>
-                Sync sources
-              </button>
-              <button type="button" className="ghost-button" onClick={handleIngest} disabled={!auth}>
-                Ingest chunks
-              </button>
-              <button
-                type="button"
-                className="ghost-button"
-                onClick={handleFlushTelemetry}
-                disabled={!auth}
-              >
-                Flush telemetry
-              </button>
-            </div>
-            <div className="button-row">
-              <button
-                type="button"
-                className="ghost-button"
-                onClick={() => void refreshTelemetry()}
-                disabled={!auth}
-              >
-                Refresh /data
-              </button>
-            </div>
-            {opsMessage ? <p className="feedback success">{opsMessage}</p> : null}
-            {opsError ? <p className="feedback error">{opsError}</p> : null}
-          </div>
-          <div className="fact-card">
-            <strong>Telemetry inspector</strong>
-            <p>Total visible events: {telemetryTotal}</p>
-            <div className="telemetry-list">
-              {telemetryItems.length === 0 ? (
-                <p className="feedback">No persisted telemetry loaded yet.</p>
-              ) : (
-                telemetryItems.slice(0, 6).map((item) => (
-                  <article key={item.id} className="telemetry-item">
-                    <strong>{item.eventType}</strong>
-                    <span>{new Date(item.timestamp).toLocaleString()}</span>
-                    <code>{JSON.stringify(item.metadata)}</code>
-                  </article>
-                ))
-              )}
-            </div>
-          </div>
+          {opsMessage ? <p className="feedback success">{opsMessage}</p> : null}
+          {opsError ? <p className="feedback error">{opsError}</p> : null}
         </aside>
+      ) : null}
+
+      <section
+        className={`chat-layout ${
+          !hasConversationHistory || !historyOpen ? 'chat-layout-single' : ''
+        }`}
+      >
+        {historyOpen && hasConversationHistory ? (
+          <aside className="history-sidebar">
+            <button type="button" className="ghost-button history-new" onClick={handleNewConversation}>
+              + Nova conversa
+            </button>
+            <div className="history-list">
+              {conversations.map((conversation) => (
+                <button
+                  key={conversation.id}
+                  type="button"
+                  className={`history-item ${
+                    conversation.id === activeConversation.id ? 'active' : ''
+                  }`}
+                  onClick={() => {
+                    setActiveConversationId(conversation.id);
+                    setHistoryOpen(false);
+                  }}
+                >
+                  <strong>{conversation.title}</strong>
+                  <span>{new Date(conversation.updatedAt).toLocaleDateString()}</span>
+                </button>
+              ))}
+            </div>
+          </aside>
+        ) : null}
+
+        <section className="chat-shell">
+        {messages.length === 0 ? (
+          <section className="empty-stage" aria-live="polite">
+            <div className="empty-state">
+              <h1>{activeCopy.empty}</h1>
+            </div>
+
+            <div className="composer-shell composer-shell-centered">
+              <div className="composer-card">
+                <textarea
+                  id="chat-question"
+                  ref={textareaRef}
+                  value={question}
+                  placeholder={activeCopy.placeholder}
+                  onChange={(event) => {
+                    setQuestion(event.target.value);
+                    telemetry.track('message_edited', { length: event.target.value.length });
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && !event.shiftKey) {
+                      event.preventDefault();
+                      if (!isAsking && question.trim()) {
+                        void handleAsk();
+                      }
+                    }
+                  }}
+                />
+                <div className="composer-actions">
+                  {chatError ? <p className="feedback error">{chatError}</p> : null}
+                  <button
+                    type="button"
+                    className="primary-button"
+                    disabled={isAsking || !question.trim()}
+                    onClick={handleAsk}
+                  >
+                    {isAsking ? '...' : activeCopy.send}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+        ) : (
+          <>
+            <div className="chat-scroll" aria-live="polite">
+              <>
+                {messages.map((message, index) => (
+                  <article key={`${message.role}-${index}`} className={`message ${message.role}`}>
+                    {message.content}
+                  </article>
+                ))}
+                {isAsking ? (
+                  <article className="message assistant typing" aria-label="Assistant is typing">
+                    <span className="typing-dot" />
+                    <span className="typing-dot" />
+                    <span className="typing-dot" />
+                  </article>
+                ) : null}
+              </>
+            </div>
+
+            <div className="composer-shell">
+              <div className="composer-card">
+                <textarea
+                  id="chat-question"
+                  ref={textareaRef}
+                  value={question}
+                  placeholder={activeCopy.placeholder}
+                  onChange={(event) => {
+                    setQuestion(event.target.value);
+                    telemetry.track('message_edited', { length: event.target.value.length });
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && !event.shiftKey) {
+                      event.preventDefault();
+                      if (!isAsking && question.trim()) {
+                        void handleAsk();
+                      }
+                    }
+                  }}
+                />
+                <div className="composer-actions">
+                  {chatError ? <p className="feedback error">{chatError}</p> : null}
+                  <button
+                    type="button"
+                    className="primary-button"
+                    disabled={isAsking || !question.trim()}
+                    onClick={handleAsk}
+                  >
+                    {isAsking ? '...' : activeCopy.send}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+        </section>
       </section>
     </main>
   );
@@ -431,5 +723,5 @@ function inferJurisdictions(question: string): Jurisdiction[] {
 
 function formatAnswer(response: AskQuestionResponse) {
   const sources = response.sources.map((source) => `${source.title} ${source.section}`).join(', ');
-  return `${response.answer}\n\nMode: ${response.mode}\nSources: ${sources}`;
+  return `${response.answer}\n\nSources: ${sources}`;
 }
