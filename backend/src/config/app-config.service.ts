@@ -16,5 +16,24 @@ export class AppConfigService {
       'postgresql://postgres:postgres@localhost:5432/handtalk_challenge'
     );
   }
-}
 
+  get llmApiUrl(): string {
+    return process.env.LLM_API_URL || 'https://api.openai.com/v1/chat/completions';
+  }
+
+  get llmApiKey(): string {
+    return process.env.LLM_API_KEY || '';
+  }
+
+  get llmModel(): string {
+    return process.env.LLM_MODEL || '';
+  }
+
+  get llmTimeoutMs(): number {
+    return Number(process.env.LLM_TIMEOUT_MS || 15000);
+  }
+
+  get llmPromptVersion(): string {
+    return process.env.LLM_PROMPT_VERSION || 'v1-grounded-sources';
+  }
+}
