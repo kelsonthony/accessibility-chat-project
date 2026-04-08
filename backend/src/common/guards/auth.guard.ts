@@ -7,12 +7,14 @@ import {
 import { JwtService } from '@nestjs/jwt';
 
 import { UsersService } from '../../users/users.service';
+import { JwtKeyService } from '../../auth/jwt-key.service';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
   constructor(
     private readonly jwtService: JwtService,
     private readonly usersService: UsersService,
+    private readonly jwtKeyService: JwtKeyService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -26,7 +28,10 @@ export class AuthGuard implements CanActivate {
     const token = authHeader.slice('Bearer '.length);
 
     try {
-      const payload = await this.jwtService.verifyAsync<{ sub: string; email: string }>(token);
+      const payload = await this.jwtService.verifyAsync<{ sub: string; email: string }>(
+        token,
+        this.jwtKeyService.verifyOptions,
+      );
       const user = await this.usersService.findById(payload.sub);
 
       if (!user) {

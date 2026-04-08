@@ -1,14 +1,14 @@
 import { Module } from '@nestjs/common';
 
+import { AuthModule } from '../auth/auth.module';
 import { UsersModule } from '../users/users.module';
-import { AuthGuard } from '../common/guards/auth.guard';
 import { IngestionController } from './ingestion.controller';
 import { IngestionService } from './ingestion.service';
 
 @Module({
-  imports: [UsersModule],
+  imports: [AuthModule, UsersModule],
   controllers: [IngestionController],
-  providers: [IngestionService, AuthGuard],
+  providers: [IngestionService],
   exports: [IngestionService],
 })
 export class IngestionModule {}

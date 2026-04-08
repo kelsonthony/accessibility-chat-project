@@ -1,15 +1,14 @@
 import { Module } from '@nestjs/common';
 
+import { AuthModule } from '../auth/auth.module';
 import { UsersModule } from '../users/users.module';
-import { AuthGuard } from '../common/guards/auth.guard';
 import { TelemetryController } from './telemetry.controller';
 import { TelemetryService } from './telemetry.service';
 
 @Module({
-  imports: [UsersModule],
+  imports: [AuthModule, UsersModule],
   controllers: [TelemetryController],
-  providers: [TelemetryService, AuthGuard],
+  providers: [TelemetryService],
   exports: [TelemetryService],
 })
 export class TelemetryModule {}
-
