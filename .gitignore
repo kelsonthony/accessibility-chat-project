@@ -9,3 +9,5 @@ coverage
 .oracle-cloud-tunnels.log
 *.tsbuildinfo
 .tmpkeys/
+.playwright-mcp/
+.playwright-mcp

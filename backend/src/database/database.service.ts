@@ -74,6 +74,24 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         detail jsonb not null default '{}'::jsonb,
         created_at timestamptz not null default now()
       );
+
+      create table if not exists accesschat.rag_query_runs (
+        id uuid primary key,
+        user_id uuid references accesschat.users(id) on delete set null,
+        question_hash text not null,
+        language text not null,
+        jurisdictions jsonb not null default '[]'::jsonb,
+        mode text not null,
+        response_origin text not null,
+        provider_model text,
+        retrieved_chunks integer not null default 0,
+        latency_ms integer not null,
+        sources jsonb not null default '[]'::jsonb,
+        created_at timestamptz not null default now()
+      );
+
+      create index if not exists rag_query_runs_created_at_idx on accesschat.rag_query_runs(created_at desc);
+      create index if not exists rag_query_runs_mode_idx on accesschat.rag_query_runs(mode);
     `);
     this.logger.log('Database schema is ready.');
   }

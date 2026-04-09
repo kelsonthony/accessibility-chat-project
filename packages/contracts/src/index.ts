@@ -5,6 +5,7 @@ export type KnowledgeSource =
   | 'WCAG'
   | 'UNDERSTANDING_WCAG'
   | 'LBI'
+  | 'HAND_TALK'
   | 'ADA'
   | 'SECTION_508'
   | 'UN_CRPD'
