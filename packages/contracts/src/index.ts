@@ -60,9 +60,63 @@ export interface SignupInput {
   displayName: string;
 }
 
+export interface SignupStartInput extends SignupInput {
+  confirmEmail: string;
+  confirmPassword: string;
+  captchaId: string;
+  captchaAnswer: string;
+}
+
+export interface SignupStartResponse {
+  verificationRequestId: string;
+  email: string;
+  expiresAt: string;
+  deliveryMode: 'email-api' | 'console';
+}
+
+export interface VerifySignupInput {
+  verificationRequestId: string;
+  email: string;
+  code: string;
+}
+
 export interface LoginInput {
   email: string;
   password: string;
+}
+
+export interface CaptchaChallenge {
+  captchaId: string;
+  prompt: string;
+  expiresAt: string;
+}
+
+export interface EmailAvailabilityResponse {
+  email: string;
+  exists: boolean;
+  available: boolean;
+}
+
+export interface ForgotPasswordInput {
+  email: string;
+  captchaId: string;
+  captchaAnswer: string;
+}
+
+export interface PasswordResetRequestResponse {
+  status: 'accepted';
+  expiresAt: string | null;
+}
+
+export interface ResetPasswordInput {
+  email: string;
+  code: string;
+  password: string;
+  confirmPassword: string;
+}
+
+export interface ResetPasswordResponse {
+  status: 'password_updated';
 }
 
 export interface RagSourceReference {

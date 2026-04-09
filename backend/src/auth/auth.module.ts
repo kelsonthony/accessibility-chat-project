@@ -5,6 +5,8 @@ import { AuthGuard } from '../common/guards/auth.guard';
 import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { CaptchaService } from './captcha.service';
+import { EmailService } from './email.service';
 import { JwtKeyService } from './jwt-key.service';
 import { resolveJwtSecurityConfig } from './jwt-key.util';
 
@@ -38,7 +40,7 @@ import { resolveJwtSecurityConfig } from './jwt-key.util';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtKeyService, AuthGuard],
-  exports: [AuthService, JwtKeyService, AuthGuard],
+  providers: [AuthService, JwtKeyService, AuthGuard, CaptchaService, EmailService],
+  exports: [AuthService, JwtKeyService, AuthGuard, CaptchaService, EmailService],
 })
 export class AuthModule {}

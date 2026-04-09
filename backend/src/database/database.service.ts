@@ -24,8 +24,14 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         email text not null unique,
         display_name text not null,
         password_hash text not null,
-        created_at timestamptz not null default now()
+        created_at timestamptz not null default now(),
+        email_verified_at timestamptz
       );
+
+      alter table accesschat.users add column if not exists email_verified_at timestamptz;
+      update accesschat.users
+      set email_verified_at = created_at
+      where email_verified_at is null;
 
       create table if not exists accesschat.telemetry_events (
         id uuid primary key,
@@ -92,6 +98,46 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
 
       create index if not exists rag_query_runs_created_at_idx on accesschat.rag_query_runs(created_at desc);
       create index if not exists rag_query_runs_mode_idx on accesschat.rag_query_runs(mode);
+
+      create table if not exists accesschat.captcha_challenges (
+        id uuid primary key,
+        prompt text not null,
+        answer_hash text not null,
+        expires_at timestamptz not null,
+        consumed_at timestamptz,
+        created_at timestamptz not null default now()
+      );
+
+      create index if not exists captcha_challenges_expires_at_idx on accesschat.captcha_challenges(expires_at desc);
+
+      create table if not exists accesschat.email_verification_requests (
+        id uuid primary key,
+        email text not null,
+        display_name text not null,
+        password_hash text not null,
+        code_hash text not null,
+        expires_at timestamptz not null,
+        attempts integer not null default 0,
+        consumed_at timestamptz,
+        created_at timestamptz not null default now()
+      );
+
+      create index if not exists email_verification_requests_email_idx
+      on accesschat.email_verification_requests(email, created_at desc);
+
+      create table if not exists accesschat.password_reset_requests (
+        id uuid primary key,
+        user_id uuid not null references accesschat.users(id) on delete cascade,
+        email text not null,
+        code_hash text not null,
+        expires_at timestamptz not null,
+        attempts integer not null default 0,
+        consumed_at timestamptz,
+        created_at timestamptz not null default now()
+      );
+
+      create index if not exists password_reset_requests_email_idx
+      on accesschat.password_reset_requests(email, created_at desc);
     `);
     this.logger.log('Database schema is ready.');
   }

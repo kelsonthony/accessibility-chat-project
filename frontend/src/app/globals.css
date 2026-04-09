@@ -234,9 +234,42 @@ button {
   gap: 12px;
 }
 
+.auth-meta-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 14px;
+}
+
+.link-button {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  padding: 0;
+  cursor: pointer;
+}
+
+.link-button:hover {
+  color: var(--text);
+}
+
 .field span {
   color: var(--muted);
   font-size: 0.92rem;
+}
+
+.field-hint {
+  margin: -4px 2px 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.field-hint.ok {
+  color: #86efac;
+}
+
+.field-hint.error {
+  color: #fda4af;
 }
 
 .field input,
@@ -248,6 +281,31 @@ button {
   color: var(--text);
   padding: 14px 16px;
   outline: none;
+}
+
+.password-input-wrap {
+  position: relative;
+}
+
+.password-input-wrap input {
+  padding-right: 96px;
+}
+
+.password-visibility-toggle {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.84rem;
+  cursor: pointer;
+  padding: 6px 8px;
+}
+
+.password-visibility-toggle:hover {
+  color: var(--text);
 }
 
 .field input:focus,
@@ -311,6 +369,49 @@ button {
 
 .auth-submit {
   width: 100%;
+}
+
+.captcha-card {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 14px;
+}
+
+.password-rules {
+  display: grid;
+  gap: 8px;
+}
+
+.password-checklist {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.password-checklist li.ok {
+  color: #86efac;
+}
+
+.captcha-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.captcha-header strong {
+  font-size: 0.96rem;
+}
+
+.captcha-refresh {
+  min-height: 36px;
+  padding: 6px 12px;
 }
 
 .auth-divider {

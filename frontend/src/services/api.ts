@@ -1,10 +1,18 @@
 import type {
   AskQuestionInput,
   AskQuestionResponse,
+  CaptchaChallenge,
   AuthResponse,
+  ForgotPasswordInput,
   LoginInput,
+  PasswordResetRequestResponse,
+  ResetPasswordInput,
+  ResetPasswordResponse,
   SignupInput,
+  SignupStartInput,
+  SignupStartResponse,
   TelemetryDataResponse,
+  VerifySignupInput,
 } from '@accessibility-platform/contracts';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
@@ -16,8 +24,44 @@ export async function signup(input: SignupInput): Promise<AuthResponse> {
   });
 }
 
+export async function fetchCaptcha(): Promise<CaptchaChallenge> {
+  return request<CaptchaChallenge>('/auth/captcha', {
+    method: 'GET',
+  });
+}
+
+export async function startSignup(input: SignupStartInput): Promise<SignupStartResponse> {
+  return request<SignupStartResponse>('/signup/start', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function verifySignup(input: VerifySignupInput): Promise<AuthResponse> {
+  return request<AuthResponse>('/signup/verify', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
 export async function login(input: LoginInput): Promise<AuthResponse> {
   return request<AuthResponse>('/login', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function forgotPassword(
+  input: ForgotPasswordInput,
+): Promise<PasswordResetRequestResponse> {
+  return request<PasswordResetRequestResponse>('/password/forgot', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function resetPassword(input: ResetPasswordInput): Promise<ResetPasswordResponse> {
+  return request<ResetPasswordResponse>('/password/reset', {
     method: 'POST',
     body: JSON.stringify(input),
   });
