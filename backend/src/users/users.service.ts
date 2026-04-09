@@ -14,6 +14,7 @@ export class UsersService {
     email: string;
     displayName: string;
     passwordHash: string;
+    emailVerifiedAt?: string;
   }): Promise<UserEntity> {
     const normalizedEmail = params.email.trim().toLowerCase();
 
@@ -30,9 +31,16 @@ export class UsersService {
     };
 
     await this.database.pool.query(
-      `insert into accesschat.users (id, email, display_name, password_hash, created_at)
-       values ($1, $2, $3, $4, $5)`,
-      [user.id, user.email, user.displayName, user.passwordHash, user.createdAt],
+      `insert into accesschat.users (id, email, display_name, password_hash, created_at, email_verified_at)
+       values ($1, $2, $3, $4, $5, $6)`,
+      [
+        user.id,
+        user.email,
+        user.displayName,
+        user.passwordHash,
+        user.createdAt,
+        params.emailVerifiedAt || user.createdAt,
+      ],
     );
 
     return user;
@@ -64,6 +72,16 @@ export class UsersService {
           createdAt: row.created_at,
         }
       : undefined;
+  }
+
+  async updatePasswordByEmail(email: string, passwordHash: string): Promise<void> {
+    const normalizedEmail = email.trim().toLowerCase();
+    await this.database.pool.query(
+      `update accesschat.users
+       set password_hash = $2
+       where email = $1`,
+      [normalizedEmail, passwordHash],
+    );
   }
 
   async findById(id: string): Promise<UserEntity | undefined> {

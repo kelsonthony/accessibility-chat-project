@@ -1,5 +1,6 @@
 node_modules
 .next
+.next-dev
 dist
 coverage
 .env
@@ -11,3 +12,7 @@ coverage
 .tmpkeys/
 .playwright-mcp/
 .playwright-mcp
+
+logins.md
+
+TODO.md

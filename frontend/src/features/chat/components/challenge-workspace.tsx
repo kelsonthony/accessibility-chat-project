@@ -5,20 +5,32 @@ import { useEffect, useRef, useState } from 'react';
 import type {
   AskQuestionResponse,
   AuthResponse,
+  CaptchaChallenge,
+  ForgotPasswordInput,
   Jurisdiction,
+  PasswordResetRequestResponse,
+  ResetPasswordInput,
+  SignupStartInput,
+  SignupStartResponse,
   SupportedLanguage,
   TelemetryDataItem,
+  VerifySignupInput,
 } from '@accessibility-platform/contracts';
 
 import { AuthPanel } from '../../auth/components/auth-panel';
 import { useTelemetryBatch } from '../../telemetry/use-telemetry-batch';
 import {
   askQuestion,
+  fetchCaptcha,
   fetchTelemetry,
+  forgotPassword,
   ingestSources,
   login,
+  resetPassword,
   signup,
+  startSignup,
   syncSources,
+  verifySignup,
 } from '../../../services/api';
 
 type Message = {
@@ -86,6 +98,9 @@ export function ChallengeWorkspace() {
   const [activeConversationId, setActiveConversationId] = useState<string>('');
   const [auth, setAuth] = useState<AuthResponse | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [authMessage, setAuthMessage] = useState<string | null>(null);
+  const [captcha, setCaptcha] = useState<CaptchaChallenge | null>(null);
+  const [captchaError, setCaptchaError] = useState<string | null>(null);
   const [chatError, setChatError] = useState<string | null>(null);
   const [opsError, setOpsError] = useState<string | null>(null);
   const [opsMessage, setOpsMessage] = useState<string | null>(null);
@@ -180,6 +195,14 @@ export function ChallengeWorkspace() {
   }, [language, telemetry]);
 
   useEffect(() => {
+    if (auth) {
+      return;
+    }
+
+    void refreshCaptcha();
+  }, [auth]);
+
+  useEffect(() => {
     if (!auth) {
       return;
     }
@@ -203,40 +226,114 @@ export function ChallengeWorkspace() {
     textarea.style.height = `${Math.min(textarea.scrollHeight, 240)}px`;
   }, [question]);
 
-  async function handleAuth(input: {
-    email: string;
-    password: string;
-    displayName?: string;
-    mode: 'login' | 'signup';
-  }) {
+  async function handleLogin(input: { email: string; password: string }) {
     setAuthError(null);
+    setAuthMessage(null);
     setIsAuthenticating(true);
 
     try {
-      const response =
-        input.mode === 'signup'
-          ? await signup({
-              email: input.email,
-              password: input.password,
-              displayName: input.displayName || 'Accessibility Analyst',
-            })
-          : await login({
-              email: input.email,
-              password: input.password,
-            });
+      const response = await login({
+        email: input.email,
+        password: input.password,
+      });
 
       setAuth(response);
       window.localStorage.setItem(storageKey, JSON.stringify(response));
-      telemetry.track(input.mode === 'signup' ? 'signup_succeeded' : 'login_succeeded', {
+      telemetry.track('login_succeeded', {
         emailDomain: input.email.split('@')[1] || 'unknown',
       });
       setOpsMessage('Sessão autenticada.');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Authentication failed.';
       setAuthError(message);
-      telemetry.track(input.mode === 'signup' ? 'signup_failed' : 'login_failed', {
+      telemetry.track('login_failed', {
         reason: message,
       });
+    } finally {
+      setIsAuthenticating(false);
+    }
+  }
+
+  async function handleStartSignup(input: SignupStartInput): Promise<SignupStartResponse> {
+    setAuthError(null);
+    setAuthMessage(null);
+    setIsAuthenticating(true);
+
+    try {
+      const response = await startSignup(input);
+      telemetry.track('signup_succeeded', {
+        emailDomain: input.email.split('@')[1] || 'unknown',
+        deliveryMode: response.deliveryMode,
+      });
+      setAuthMessage(`Codigo enviado para ${response.email}.`);
+      await refreshCaptcha();
+      return response;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to start signup.';
+      setAuthError(message);
+      telemetry.track('signup_failed', {
+        reason: message,
+      });
+      await refreshCaptcha();
+      throw error;
+    } finally {
+      setIsAuthenticating(false);
+    }
+  }
+
+  async function handleVerifySignup(input: VerifySignupInput) {
+    setAuthError(null);
+    setAuthMessage(null);
+    setIsAuthenticating(true);
+
+    try {
+      const response = await verifySignup(input);
+      setAuth(response);
+      window.localStorage.setItem(storageKey, JSON.stringify(response));
+      setOpsMessage('Sessão autenticada.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to verify signup.';
+      setAuthError(message);
+      throw error;
+    } finally {
+      setIsAuthenticating(false);
+    }
+  }
+
+  async function handleForgotPassword(
+    input: ForgotPasswordInput,
+  ): Promise<PasswordResetRequestResponse> {
+    setAuthError(null);
+    setAuthMessage(null);
+    setIsAuthenticating(true);
+
+    try {
+      const response = await forgotPassword(input);
+      setAuthMessage(`Se o email existir, um codigo foi enviado para ${input.email}.`);
+      await refreshCaptcha();
+      return response;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to request password reset.';
+      setAuthError(message);
+      await refreshCaptcha();
+      throw error;
+    } finally {
+      setIsAuthenticating(false);
+    }
+  }
+
+  async function handleResetPassword(input: ResetPasswordInput) {
+    setAuthError(null);
+    setAuthMessage(null);
+    setIsAuthenticating(true);
+
+    try {
+      await resetPassword(input);
+      setAuthMessage('Senha redefinida. Faça login com a nova senha.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to reset password.';
+      setAuthError(message);
+      throw error;
     } finally {
       setIsAuthenticating(false);
     }
@@ -257,6 +354,7 @@ export function ChallengeWorkspace() {
     }[provider];
 
     setAuthError(null);
+    setAuthMessage(null);
     setIsAuthenticating(true);
 
     try {
@@ -291,6 +389,17 @@ export function ChallengeWorkspace() {
       });
     } finally {
       setIsAuthenticating(false);
+    }
+  }
+
+  async function refreshCaptcha() {
+    try {
+      const nextCaptcha = await fetchCaptcha();
+      setCaptcha(nextCaptcha);
+      setCaptchaError(null);
+    } catch {
+      setCaptcha(null);
+      setCaptchaError('Nao foi possivel carregar o captcha.');
     }
   }
 
@@ -479,10 +588,18 @@ export function ChallengeWorkspace() {
           </div>
         </div>
         <AuthPanel
-          onSubmit={handleAuth}
+          captcha={captcha}
+          captchaError={captchaError}
+          onRefreshCaptcha={refreshCaptcha}
+          onLogin={handleLogin}
+          onStartSignup={handleStartSignup}
+          onVerifySignup={handleVerifySignup}
+          onForgotPassword={handleForgotPassword}
+          onResetPassword={handleResetPassword}
           onSocialAuth={handleSocialAuth}
           isPending={isAuthenticating}
           error={authError}
+          successMessage={authMessage}
         />
       </main>
     );
