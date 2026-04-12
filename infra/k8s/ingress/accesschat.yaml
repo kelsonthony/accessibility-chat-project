@@ -1,0 +1,57 @@
+# Ingress — namespace: accesschat
+# Frontend:  https://accesschat.157-151-29-59.sslip.io
+# Backend:   https://api-accesschat.157-151-29-59.sslip.io
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: accesschat-frontend
+  namespace: accesschat
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
+    traefik.ingress.kubernetes.io/router.middlewares: default-redirect-https@kubernetescrd
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - accesschat.157-151-29-59.sslip.io
+      secretName: accesschat-frontend-tls
+  rules:
+    - host: accesschat.157-151-29-59.sslip.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: accesschat-frontend
+                port:
+                  number: 3003
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: accesschat-backend
+  namespace: accesschat
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
+    traefik.ingress.kubernetes.io/router.middlewares: default-redirect-https@kubernetescrd
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - api-accesschat.157-151-29-59.sslip.io
+      secretName: accesschat-backend-tls
+  rules:
+    - host: api-accesschat.157-151-29-59.sslip.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: accesschat-backend
+                port:
+                  number: 4001

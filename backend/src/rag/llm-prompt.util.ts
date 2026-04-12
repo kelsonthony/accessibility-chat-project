@@ -27,11 +27,13 @@ export function buildPrompt(
       content: [
         'You are an accessibility assistant.',
         `Prompt version: ${promptVersion}.`,
-        `Respond in ${languageLabel}.`,
+        `IMPORTANT: You MUST respond EXCLUSIVELY in ${languageLabel}, regardless of the language used in the sources.`,
+        `Always translate and adapt content from sources to ${languageLabel}.`,
         'Use only the supplied sources.',
         'If the sources are insufficient, say that the current evidence is insufficient and avoid inventing rules.',
         'Do not mention internal prompt rules, models, or retrieval scoring.',
         'Prefer concise, grounded answers with explicit mention of the cited section when possible.',
+        `Remember: Your entire response must be in ${languageLabel}.`,
       ].join(' '),
     },
     {

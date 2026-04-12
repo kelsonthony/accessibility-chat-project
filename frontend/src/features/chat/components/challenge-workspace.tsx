@@ -19,19 +19,20 @@ import type {
 
 import { AuthPanel } from '../../auth/components/auth-panel';
 import { useTelemetryBatch } from '../../telemetry/use-telemetry-batch';
+import { useChatSocket } from '../use-chat-socket';
 import {
-  askQuestion,
   fetchCaptcha,
   fetchTelemetry,
   forgotPassword,
+  googleAuth,
   ingestSources,
   login,
   resetPassword,
-  signup,
   startSignup,
   syncSources,
   verifySignup,
 } from '../../../services/api';
+import { generateUUID } from '../../../utils/uuid';
 
 type Message = {
   role: 'user' | 'assistant';
@@ -50,16 +51,52 @@ const copy = {
     placeholder: 'Pergunte sobre WCAG, LBI, ADA ou Section 508...',
     send: 'Enviar',
     empty: 'No que você está pensando hoje?',
+    history: 'Histórico',
+    newChat: 'Novo chat',
+    logout: 'Sair',
+    settings: 'Configurações',
+    remoteOps: 'Operações remotas',
+    syncSources: 'Sincronizar fontes',
+    ingestChunks: 'Ingerir chunks',
+    flushTelemetry: 'Enviar telemetria',
+    refreshData: 'Atualizar /data',
+    telemetry: 'Telemetria',
+    storedEvents: 'Eventos armazenados',
+    newConversation: 'Nova conversa',
   },
   en: {
     placeholder: 'Ask about WCAG, ADA, Section 508, LBI, or EN 301 549...',
     send: 'Send',
     empty: 'How can I help you today with accessibility content?',
+    history: 'History',
+    newChat: 'New chat',
+    logout: 'Logout',
+    settings: 'Settings',
+    remoteOps: 'Remote ops',
+    syncSources: 'Sync sources',
+    ingestChunks: 'Ingest chunks',
+    flushTelemetry: 'Flush telemetry',
+    refreshData: 'Refresh /data',
+    telemetry: 'Telemetry',
+    storedEvents: 'Stored events',
+    newConversation: 'New conversation',
   },
   es: {
     placeholder: 'Pregunta sobre WCAG, ADA, Section 508, LBI o EN 301 549...',
     send: 'Enviar',
     empty: '¿Cómo puedo ayudarte hoy con contenido de accesibilidad?',
+    history: 'Historial',
+    newChat: 'Nuevo chat',
+    logout: 'Cerrar sesión',
+    settings: 'Configuración',
+    remoteOps: 'Operaciones remotas',
+    syncSources: 'Sincronizar fuentes',
+    ingestChunks: 'Ingerir fragmentos',
+    flushTelemetry: 'Enviar telemetría',
+    refreshData: 'Actualizar /data',
+    telemetry: 'Telemetría',
+    storedEvents: 'Eventos almacenados',
+    newConversation: 'Nueva conversación',
   },
 } as const;
 
@@ -75,17 +112,32 @@ const activeConversationStorageKey = 'handtalk-active-conversation';
 const historyOpenStorageKey = 'handtalk-history-open';
 const languageStorageKey = 'handtalk-language';
 const minimumReplyDelayMs = 700;
-const initialConversation: Conversation = {
-  id: 'initial-conversation',
-  title: 'Nova conversa',
-  messages: [],
-  updatedAt: '',
-};
 
-function createBlankConversation(): Conversation {
+function getInitialConversation(language: SupportedLanguage): Conversation {
+  const titles = {
+    pt: 'Nova conversa',
+    en: 'New conversation',
+    es: 'Nueva conversación',
+  };
+
   return {
-    id: crypto.randomUUID(),
-    title: 'Nova conversa',
+    id: 'initial-conversation',
+    title: titles[language],
+    messages: [],
+    updatedAt: '',
+  };
+}
+
+function createBlankConversation(language: SupportedLanguage): Conversation {
+  const titles = {
+    pt: 'Nova conversa',
+    en: 'New conversation',
+    es: 'Nueva conversación',
+  };
+
+  return {
+    id: generateUUID(),
+    title: titles[language],
     messages: [],
     updatedAt: new Date().toISOString(),
   };
@@ -94,7 +146,7 @@ function createBlankConversation(): Conversation {
 export function ChallengeWorkspace() {
   const [language, setLanguage] = useState<SupportedLanguage>('pt');
   const [question, setQuestion] = useState('');
-  const [conversations, setConversations] = useState<Conversation[]>([initialConversation]);
+  const [conversations, setConversations] = useState<Conversation[]>([getInitialConversation('pt')]);
   const [activeConversationId, setActiveConversationId] = useState<string>('');
   const [auth, setAuth] = useState<AuthResponse | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -112,6 +164,11 @@ export function ChallengeWorkspace() {
   const [isAsking, setIsAsking] = useState(false);
   const [sessionId, setSessionId] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const typingPauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const backspaceCountRef = useRef(0);
+  const backspaceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isTypingStartedRef = useRef(false);
+  const authRef = useRef<AuthResponse | null>(null);
 
   const telemetry = useTelemetryBatch({
     token: auth?.accessToken || null,
@@ -119,8 +176,10 @@ export function ChallengeWorkspace() {
     language,
   });
 
+  const chatSocket = useChatSocket(auth?.accessToken ?? null);
+
   useEffect(() => {
-    setSessionId(crypto.randomUUID());
+    setSessionId(generateUUID());
   }, []);
 
   useEffect(() => {
@@ -167,8 +226,13 @@ export function ChallengeWorkspace() {
   }, []);
 
   useEffect(() => {
-    setActiveConversationId((current) => current || conversations[0]?.id || '');
-  }, [conversations]);
+    if (!activeConversationId && conversations.length > 0) {
+      const firstConversationId = conversations[0]?.id;
+      if (firstConversationId) {
+        setActiveConversationId(firstConversationId);
+      }
+    }
+  }, [conversations, activeConversationId]);
 
   useEffect(() => {
     window.localStorage.setItem(conversationsStorageKey, JSON.stringify(conversations));
@@ -192,7 +256,78 @@ export function ChallengeWorkspace() {
 
   useEffect(() => {
     telemetry.track('language_changed', { language });
-  }, [language, telemetry]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [language]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Tab' || e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        telemetry.track('keyboard_navigation_detected', { key: e.key });
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-contrast: more)');
+    if (mq.matches) {
+      telemetry.track('high_contrast_mode_enabled', { source: 'initial' });
+    }
+    const handler = (e: MediaQueryListEvent) => {
+      if (e.matches) telemetry.track('high_contrast_mode_enabled', { source: 'change' });
+    };
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const handleUnload = () => {
+      if (!authRef.current) return;
+      telemetry.track('session_ended', { trigger: 'tab_close' });
+      void telemetry.flush('visibility');
+    };
+    window.addEventListener('beforeunload', handleUnload);
+    return () => window.removeEventListener('beforeunload', handleUnload);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    // Update conversation titles when language changes
+    const newConversationTitles = {
+      pt: 'Nova conversa',
+      en: 'New conversation',
+      es: 'Nueva conversación',
+    };
+
+    setConversations((current) => {
+      let hasChanges = false;
+      const updated = current.map((conversation) => {
+        const isDefaultTitle =
+          conversation.title === 'Nova conversa' ||
+          conversation.title === 'New conversation' ||
+          conversation.title === 'Nueva conversación';
+
+        if (isDefaultTitle && conversation.messages.length === 0) {
+          const newTitle = newConversationTitles[language];
+          if (conversation.title !== newTitle) {
+            hasChanges = true;
+            return {
+              ...conversation,
+              title: newTitle,
+            };
+          }
+        }
+
+        return conversation;
+      });
+
+      // Only update if there were actual changes
+      return hasChanges ? updated : current;
+    });
+  }, [language]);
 
   useEffect(() => {
     if (auth) {
@@ -208,6 +343,10 @@ export function ChallengeWorkspace() {
     }
 
     void refreshTelemetry(auth.accessToken);
+  }, [auth]);
+
+  useEffect(() => {
+    authRef.current = auth;
   }, [auth]);
 
   const activeCopy = copy[language];
@@ -242,6 +381,7 @@ export function ChallengeWorkspace() {
       telemetry.track('login_succeeded', {
         emailDomain: input.email.split('@')[1] || 'unknown',
       });
+      telemetry.track('session_started', { method: 'password' });
       setOpsMessage('Sessão autenticada.');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Authentication failed.';
@@ -290,6 +430,7 @@ export function ChallengeWorkspace() {
       const response = await verifySignup(input);
       setAuth(response);
       window.localStorage.setItem(storageKey, JSON.stringify(response));
+      telemetry.track('session_started', { method: 'signup' });
       setOpsMessage('Sessão autenticada.');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to verify signup.';
@@ -339,53 +480,86 @@ export function ChallengeWorkspace() {
     }
   }
 
-  async function handleSocialAuth(provider: 'google' | 'github') {
-    const credentials = {
-      google: {
-        email: 'google.user@accesschat.dev',
-        password: 'StrongPass123',
-        displayName: 'Google User',
-      },
-      github: {
-        email: 'github.user@accesschat.dev',
-        password: 'StrongPass123',
-        displayName: 'GitHub User',
-      },
-    }[provider];
-
+  async function handleGoogleAuth() {
     setAuthError(null);
     setAuthMessage(null);
     setIsAuthenticating(true);
 
     try {
-      let response: AuthResponse;
-
-      try {
-        response = await login({
-          email: credentials.email,
-          password: credentials.password,
-        });
-      } catch {
-        response = await signup({
-          email: credentials.email,
-          password: credentials.password,
-          displayName: credentials.displayName,
-        });
+      const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+      if (!clientId) {
+        throw new Error('Google Client ID não configurado.');
       }
 
+      const redirectUri = `${window.location.origin}/auth/callback`;
+      const params = new URLSearchParams({
+        client_id: clientId,
+        redirect_uri: redirectUri,
+        response_type: 'code',
+        scope: 'email profile',
+        access_type: 'offline',
+        prompt: 'select_account',
+      });
+
+      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+
+      const width = 500;
+      const height = 600;
+      const left = window.screenLeft + Math.round((window.outerWidth - width) / 2);
+      const top = window.screenTop + Math.round((window.outerHeight - height) / 2);
+
+      const popup = window.open(
+        authUrl,
+        'google-auth',
+        `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no`,
+      );
+
+      if (!popup) {
+        throw new Error('Popup bloqueado pelo navegador. Permita popups para este site.');
+      }
+
+      const code = await new Promise<string>((resolve, reject) => {
+        const timer = setInterval(() => {
+          if (popup.closed) {
+            clearInterval(timer);
+            reject(new Error('Login com Google cancelado.'));
+          }
+        }, 500);
+
+        function onMessage(event: MessageEvent) {
+          if (event.origin !== window.location.origin) return;
+          if (event.data?.type !== 'GOOGLE_AUTH_CALLBACK') return;
+
+          clearInterval(timer);
+          window.removeEventListener('message', onMessage);
+
+          if (event.data.error) {
+            reject(new Error(`Erro do Google: ${event.data.error}`));
+          } else if (event.data.code) {
+            resolve(event.data.code as string);
+          } else {
+            reject(new Error('Resposta inválida do Google.'));
+          }
+        }
+
+        window.addEventListener('message', onMessage);
+      });
+
+      const response = await googleAuth(code, redirectUri);
       setAuth(response);
       window.localStorage.setItem(storageKey, JSON.stringify(response));
       telemetry.track('login_succeeded', {
-        emailDomain: credentials.email.split('@')[1] || 'unknown',
-        provider,
+        emailDomain: response.user.email.split('@')[1] || 'unknown',
+        provider: 'google',
       });
-      setOpsMessage(`Sessão autenticada via ${provider === 'google' ? 'Google' : 'GitHub'} em modo demo.`);
+      telemetry.track('session_started', { method: 'google' });
+      setOpsMessage('Sessão autenticada via Google.');
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Social authentication failed.';
+      const message = error instanceof Error ? error.message : 'Falha na autenticação com Google.';
       setAuthError(message);
       telemetry.track('login_failed', {
         reason: message,
-        provider,
+        provider: 'google',
       });
     } finally {
       setIsAuthenticating(false);
@@ -427,7 +601,7 @@ export function ChallengeWorkspace() {
 
     try {
       const startedAt = Date.now();
-      const response = await askQuestion(auth.accessToken, {
+      const response = await chatSocket.ask({
         question: submittedQuestion,
         language,
         jurisdictions: inferJurisdictions(submittedQuestion),
@@ -451,6 +625,10 @@ export function ChallengeWorkspace() {
       telemetry.track('answer_received', {
         mode: response.mode,
         sources: response.sources.length,
+      });
+      telemetry.track('request_latency_observed', {
+        latencyMs: elapsed,
+        mode: response.mode,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to send question.';
@@ -521,9 +699,11 @@ export function ChallengeWorkspace() {
   }
 
   function handleLogout() {
+    telemetry.track('session_ended', { trigger: 'logout' });
+    void telemetry.flush('visibility');
     window.localStorage.removeItem(storageKey);
     setAuth(null);
-    const blankConversation = createBlankConversation();
+    const blankConversation = createBlankConversation(language);
     setConversations([blankConversation]);
     setActiveConversationId(blankConversation.id);
     window.localStorage.removeItem(conversationsStorageKey);
@@ -534,12 +714,72 @@ export function ChallengeWorkspace() {
   }
 
   function handleNewConversation() {
-    const newConversation = createBlankConversation();
+    if (question.trim()) {
+      telemetry.track('message_abandoned', { length: question.length, trigger: 'new_conversation' });
+    }
+    const newConversation = createBlankConversation(language);
 
     setConversations((current) => [newConversation, ...current]);
     setActiveConversationId(newConversation.id);
     setQuestion('');
+    isTypingStartedRef.current = false;
     setHistoryOpen(false);
+  }
+
+  function handleTextareaChange(event: React.ChangeEvent<HTMLTextAreaElement>) {
+    const next = event.target.value;
+    const prev = question;
+
+    if (!isTypingStartedRef.current && next.length > 0) {
+      isTypingStartedRef.current = true;
+      telemetry.track('message_started', { length: next.length });
+    }
+
+    if (prev.trim() && !next.trim()) {
+      telemetry.track('message_cleared', { previousLength: prev.length });
+      isTypingStartedRef.current = false;
+    }
+
+    if (typingPauseTimerRef.current) clearTimeout(typingPauseTimerRef.current);
+    if (next.trim()) {
+      typingPauseTimerRef.current = setTimeout(() => {
+        telemetry.track('typing_pause_detected', { length: next.length, pauseMs: 3000 });
+      }, 3000);
+    }
+
+    setQuestion(next);
+    telemetry.track('message_edited', { length: next.length });
+  }
+
+  function handleTextareaKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      if (typingPauseTimerRef.current) clearTimeout(typingPauseTimerRef.current);
+      isTypingStartedRef.current = false;
+      if (!isAsking && question.trim()) {
+        void handleAsk();
+      }
+      return;
+    }
+
+    if (event.key === 'Backspace') {
+      backspaceCountRef.current += 1;
+      if (backspaceTimerRef.current) clearTimeout(backspaceTimerRef.current);
+      backspaceTimerRef.current = setTimeout(() => {
+        backspaceCountRef.current = 0;
+      }, 2000);
+      if (backspaceCountRef.current >= 5) {
+        telemetry.track('repeated_backspace_burst', { count: backspaceCountRef.current });
+        backspaceCountRef.current = 0;
+      }
+    }
+  }
+
+  function handleTextareaBlur() {
+    if (question.trim()) {
+      telemetry.track('focus_loss_detected', { length: question.length });
+    }
+    if (typingPauseTimerRef.current) clearTimeout(typingPauseTimerRef.current);
   }
 
   function handleLanguageChange(nextLanguage: SupportedLanguage) {
@@ -550,6 +790,8 @@ export function ChallengeWorkspace() {
   }
 
   function updateConversation(id: string, nextMessages: Message[], draftTitle?: string) {
+    const newConversationTitles = ['Nova conversa', 'New conversation', 'Nueva conversación'];
+
     setConversations((current) =>
       current.map((conversation) =>
         conversation.id === id
@@ -557,7 +799,7 @@ export function ChallengeWorkspace() {
               ...conversation,
               messages: nextMessages,
               title:
-                conversation.title === 'Nova conversa' && draftTitle
+                newConversationTitles.includes(conversation.title) && draftTitle
                   ? draftTitle.slice(0, 48)
                   : conversation.title,
               updatedAt: new Date().toISOString(),
@@ -596,7 +838,7 @@ export function ChallengeWorkspace() {
           onVerifySignup={handleVerifySignup}
           onForgotPassword={handleForgotPassword}
           onResetPassword={handleResetPassword}
-          onSocialAuth={handleSocialAuth}
+          onGoogleAuth={handleGoogleAuth}
           isPending={isAuthenticating}
           error={authError}
           successMessage={authMessage}
@@ -627,10 +869,10 @@ export function ChallengeWorkspace() {
             aria-expanded={historyOpen}
             onClick={() => setHistoryOpen((value) => !value)}
           >
-            Historico
+            {activeCopy.history}
           </button>
           <button type="button" className="ghost-button topbar-new-chat" onClick={handleNewConversation}>
-            Novo chat
+            {activeCopy.newChat}
           </button>
         </div>
         <div className="topbar-right">
@@ -648,34 +890,34 @@ export function ChallengeWorkspace() {
             ))}
           </div>
           <button type="button" className="ghost-button topbar-logout" onClick={handleLogout}>
-            Logout
+            {activeCopy.logout}
           </button>
         </div>
       </div>
 
       {settingsOpen ? (
-        <aside className="settings-drawer">
+        <aside className="settings-drawer" aria-label={activeCopy.settings}>
           <div className="settings-section">
-            <strong>Settings</strong>
+            <strong>{activeCopy.settings}</strong>
           </div>
           <div className="settings-section">
-            <strong>Remote ops</strong>
+            <strong>{activeCopy.remoteOps}</strong>
             <button type="button" className="ghost-button" onClick={handleSync}>
-              Sync sources
+              {activeCopy.syncSources}
             </button>
             <button type="button" className="ghost-button" onClick={handleIngest}>
-              Ingest chunks
+              {activeCopy.ingestChunks}
             </button>
             <button type="button" className="ghost-button" onClick={handleFlushTelemetry}>
-              Flush telemetry
+              {activeCopy.flushTelemetry}
             </button>
             <button type="button" className="ghost-button" onClick={() => void refreshTelemetry()}>
-              Refresh /data
+              {activeCopy.refreshData}
             </button>
           </div>
           <div className="settings-section">
-            <strong>Telemetry</strong>
-            <p className="feedback">Stored events: {telemetryTotal}</p>
+            <strong>{activeCopy.telemetry}</strong>
+            <p className="feedback">{activeCopy.storedEvents}: {telemetryTotal}</p>
             {telemetryItems.slice(0, 5).map((item) => (
               <article key={item.id} className="settings-item">
                 <strong>{item.eventType}</strong>
@@ -694,9 +936,9 @@ export function ChallengeWorkspace() {
         }`}
       >
         {historyOpen && hasConversationHistory ? (
-          <aside className="history-sidebar">
+          <aside className="history-sidebar" aria-label={activeCopy.history}>
             <button type="button" className="ghost-button history-new" onClick={handleNewConversation}>
-              + Nova conversa
+              + {activeCopy.newConversation}
             </button>
             <div className="history-list">
               {conversations.map((conversation) => (
@@ -728,23 +970,18 @@ export function ChallengeWorkspace() {
 
             <div className="composer-shell composer-shell-centered">
               <div className="composer-card">
+                <label htmlFor="chat-question" className="visually-hidden">
+                  {activeCopy.placeholder}
+                </label>
                 <textarea
                   id="chat-question"
                   ref={textareaRef}
                   value={question}
                   placeholder={activeCopy.placeholder}
-                  onChange={(event) => {
-                    setQuestion(event.target.value);
-                    telemetry.track('message_edited', { length: event.target.value.length });
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' && !event.shiftKey) {
-                      event.preventDefault();
-                      if (!isAsking && question.trim()) {
-                        void handleAsk();
-                      }
-                    }
-                  }}
+                  aria-label={activeCopy.placeholder}
+                  onChange={handleTextareaChange}
+                  onKeyDown={handleTextareaKeyDown}
+                  onBlur={handleTextareaBlur}
                 />
                 <div className="composer-actions">
                   {chatError ? <p className="feedback error">{chatError}</p> : null}
@@ -765,7 +1002,11 @@ export function ChallengeWorkspace() {
             <div className="chat-scroll" aria-live="polite">
               <>
                 {messages.map((message, index) => (
-                  <article key={`${message.role}-${index}`} className={`message ${message.role}`}>
+                  <article
+                    key={`${message.role}-${index}`}
+                    className={`message ${message.role}`}
+                    aria-label={message.role === 'user' ? 'You' : 'Assistant'}
+                  >
                     {message.content}
                   </article>
                 ))}
@@ -781,23 +1022,18 @@ export function ChallengeWorkspace() {
 
             <div className="composer-shell">
               <div className="composer-card">
+                <label htmlFor="chat-question" className="visually-hidden">
+                  {activeCopy.placeholder}
+                </label>
                 <textarea
                   id="chat-question"
                   ref={textareaRef}
                   value={question}
                   placeholder={activeCopy.placeholder}
-                  onChange={(event) => {
-                    setQuestion(event.target.value);
-                    telemetry.track('message_edited', { length: event.target.value.length });
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' && !event.shiftKey) {
-                      event.preventDefault();
-                      if (!isAsking && question.trim()) {
-                        void handleAsk();
-                      }
-                    }
-                  }}
+                  aria-label={activeCopy.placeholder}
+                  onChange={handleTextareaChange}
+                  onKeyDown={handleTextareaKeyDown}
+                  onBlur={handleTextareaBlur}
                 />
                 <div className="composer-actions">
                   {chatError ? <p className="feedback error">{chatError}</p> : null}

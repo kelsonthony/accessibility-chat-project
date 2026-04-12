@@ -5,13 +5,15 @@
   "workspaces": [
     "backend",
     "frontend",
-    "packages/*"
+    "packages/*",
+    "e2e"
   ],
   "scripts": {
     "dev:backend": "npm run dev --workspace @handtalk-challenge/backend",
     "dev:frontend": "npm run dev --workspace @handtalk-challenge/frontend",
     "build": "npm run build --workspaces",
     "lint": "npm run lint --workspaces",
-    "test": "npm run test --workspaces"
+    "test": "npm run test --workspaces --if-present",
+    "test:e2e": "npm run test --workspace @handtalk-challenge/e2e"
   }
 }

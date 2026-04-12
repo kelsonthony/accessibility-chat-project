@@ -197,6 +197,69 @@ export class AuthService {
     return this.issueToken(user.id);
   }
 
+  async googleAuth(code: string, redirectUri: string): Promise<AuthResponse> {
+    if (!this.config.googleClientId || !this.config.googleClientSecret) {
+      throw new UnauthorizedException(
+        'Google OAuth não está configurado no servidor (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET ausentes).',
+      );
+    }
+
+    // Troca o authorization code por tokens
+    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code,
+        client_id: this.config.googleClientId,
+        client_secret: this.config.googleClientSecret,
+        redirect_uri: redirectUri,
+        grant_type: 'authorization_code',
+      }).toString(),
+    });
+
+    if (!tokenRes.ok) {
+      const err = (await tokenRes.json().catch(() => null)) as { error_description?: string } | null;
+      throw new UnauthorizedException(err?.error_description || 'Falha ao trocar código do Google.');
+    }
+
+    const tokens = (await tokenRes.json()) as { access_token: string };
+
+    // Busca informações do usuário
+    const userRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: { Authorization: `Bearer ${tokens.access_token}` },
+    });
+
+    if (!userRes.ok) {
+      throw new UnauthorizedException('Não foi possível obter dados do usuário do Google.');
+    }
+
+    const userInfo = (await userRes.json()) as {
+      email: string;
+      verified_email: boolean;
+      name?: string;
+    };
+
+    if (!userInfo.verified_email) {
+      throw new UnauthorizedException('O email do Google não está verificado.');
+    }
+
+    const email = userInfo.email.trim().toLowerCase();
+    let user = await this.usersService.findByEmail(email);
+
+    if (!user) {
+      const displayName = userInfo.name || email.split('@')[0];
+      const passwordHash = await hash(randomUUID(), 10);
+      user = await this.usersService.create({
+        email,
+        displayName,
+        passwordHash,
+        emailVerifiedAt: new Date().toISOString(),
+      });
+    }
+
+    return this.issueToken(user.id);
+  }
+
   async login(input: LoginInput): Promise<AuthResponse> {
     const user = await this.usersService.findByEmail(input.email);
 

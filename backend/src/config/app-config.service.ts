@@ -61,6 +61,14 @@ export class AppConfigService {
     return this.emailApiKey ? 'email-api' : 'console';
   }
 
+  get googleClientId(): string {
+    return process.env.GOOGLE_CLIENT_ID || '';
+  }
+
+  get googleClientSecret(): string {
+    return process.env.GOOGLE_CLIENT_SECRET || '';
+  }
+
   get signupCodeTtlMs(): number {
     return Number(process.env.SIGNUP_CODE_TTL_MS || 60000);
   }
@@ -75,5 +83,25 @@ export class AppConfigService {
 
   get emailFailoverToConsole(): boolean {
     return process.env.EMAIL_FAILOVER_TO_CONSOLE !== 'false';
+  }
+
+  get whatsappApiBaseUrl(): string {
+    return process.env.WHATSAPP_API_BASE_URL || 'https://api.twilio.com';
+  }
+
+  get whatsappAccountSid(): string {
+    return process.env.WHATSAPP_ACCOUNT_SID || '';
+  }
+
+  get whatsappAuthToken(): string {
+    return process.env.WHATSAPP_AUTH_TOKEN || '';
+  }
+
+  get whatsappFromNumber(): string {
+    return process.env.WHATSAPP_FROM_NUMBER || 'whatsapp:+14155238886';
+  }
+
+  get whatsappWebhookAuthToken(): string {
+    return process.env.WHATSAPP_WEBHOOK_AUTH_TOKEN || '';
   }
 }

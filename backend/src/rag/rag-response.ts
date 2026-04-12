@@ -26,18 +26,55 @@ export function buildFallbackAnswer(input: AskQuestionInput): AskQuestionRespons
 }
 
 export function detectLanguage(question: string): SupportedLanguage {
-  if (/\b(hand talk|sorenson|gifted citizen|banco interamericano|bid)\b/i.test(question)) {
-    return 'pt';
+  const normalized = question.toLowerCase();
+
+  // Portuguese indicators (weighted scoring)
+  let ptScore = 0;
+  let enScore = 0;
+  let esScore = 0;
+
+  // Strong Portuguese indicators
+  if (/\b(acessibilidade|como|qual|quais|onde|porque|voce|você|esta|está|tem|são|preciso|gostaria|poderia)\b/i.test(normalized)) {
+    ptScore += 3;
+  }
+  if (/\b(ção|ões|mente|izar)\b/i.test(normalized)) {
+    ptScore += 2;
+  }
+  if (/\b(hand talk|lbi|brasil|sorenson|banco interamericano)\b/i.test(normalized)) {
+    ptScore += 2;
   }
 
-  if (/[¿¡]/.test(question) || /\b(el|la|que|para)\b/i.test(question)) {
+  // Strong Spanish indicators
+  if (/[¿¡]/.test(question)) {
+    esScore += 5;
+  }
+  if (/\b(accesibilidad|cómo|cuál|cuáles|dónde|por qué|porqué|está|están|necesito|quisiera|podría)\b/i.test(normalized)) {
+    esScore += 3;
+  }
+  if (/\b(ción|mente|izar|para|con|desde)\b/i.test(normalized)) {
+    esScore += 1;
+  }
+
+  // Strong English indicators
+  if (/\b(accessibility|how|what|where|why|should|would|could|need|want|can)\b/i.test(normalized)) {
+    enScore += 3;
+  }
+  if (/\b(the|with|from|this|that|these|those)\b/i.test(normalized)) {
+    enScore += 1;
+  }
+  if (/\b(wcag|ada|section 508|aria)\b/i.test(normalized)) {
+    enScore += 2;
+  }
+
+  // Return the language with highest score
+  if (esScore > ptScore && esScore > enScore) {
     return 'es';
   }
-
-  if (/\b(the|for|with|should)\b/i.test(question)) {
+  if (enScore > ptScore && enScore > esScore) {
     return 'en';
   }
 
+  // Default to Portuguese (Brazilian market)
   return 'pt';
 }
 

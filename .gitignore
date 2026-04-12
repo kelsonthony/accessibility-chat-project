@@ -5,6 +5,7 @@ dist
 coverage
 .env
 .env.local
+client_secret_*.json
 .oracle-cloud-tunnels.pid
 .oracle-cloud-tunnels.sock
 .oracle-cloud-tunnels.log
