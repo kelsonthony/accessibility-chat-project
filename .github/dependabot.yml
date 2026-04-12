@@ -1,0 +1,34 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      nextjs:
+        patterns:
+          - "next"
+          - "@next/*"
+      nestjs:
+        patterns:
+          - "@nestjs/*"
+      playwright:
+        patterns:
+          - "@playwright/*"
+          - "playwright"
+    ignore:
+      # lodash CVEs (Code Injection, Prototype Pollution) have no fixed version
+      # affected only via dev dependency @nestjs/cli > node-emoji — not exploitable in this context
+      - dependency-name: "lodash"
+        update-types: ["version-update:semver-patch", "version-update:semver-minor"]
+      # js-yaml 4.x is safe; alerts are for 3.x — transitive via @nestjs/cli
+      - dependency-name: "js-yaml"
+        update-types: ["version-update:semver-patch"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
