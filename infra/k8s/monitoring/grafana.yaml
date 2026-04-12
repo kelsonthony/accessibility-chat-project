@@ -9,6 +9,7 @@ data:
     apiVersion: 1
     datasources:
       - name: Prometheus
+        uid: prometheus
         type: prometheus
         access: proxy
         url: http://prometheus:9090
@@ -73,6 +74,8 @@ spec:
               mountPath: /etc/grafana/provisioning/datasources
             - name: dashboards-provider
               mountPath: /etc/grafana/provisioning/dashboards
+            - name: dashboards-files
+              mountPath: /var/lib/grafana/dashboards
             - name: data
               mountPath: /var/lib/grafana
           resources:
@@ -89,6 +92,9 @@ spec:
         - name: dashboards-provider
           configMap:
             name: grafana-dashboards-provider
+        - name: dashboards-files
+          configMap:
+            name: grafana-dashboards
         - name: data
           emptyDir: {}
 ---

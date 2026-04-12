@@ -16,7 +16,7 @@ data:
 
       - job_name: 'accesschat-backend'
         static_configs:
-          - targets: ['accesschat-backend:3001']
+          - targets: ['accesschat-backend:4001']
         metrics_path: /metrics
         scheme: http
 
@@ -28,7 +28,7 @@ data:
 
       - job_name: 'traefik'
         static_configs:
-          - targets: ['traefik.kube-system.svc.cluster.local:8082']
+          - targets: ['traefik-metrics.kube-system.svc.cluster.local:9100']
         metrics_path: /metrics
         scheme: http
 
