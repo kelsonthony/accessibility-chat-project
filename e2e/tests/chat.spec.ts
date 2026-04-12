@@ -28,7 +28,7 @@ test.describe('Chat workspace', () => {
     await page.reload();
     await expect(page.locator('form, [data-testid="auth-panel"]').or(
       page.locator('#field-email')
-    )).toBeVisible();
+    ).first()).toBeVisible();
     await expect(page.locator('#chat-question')).not.toBeVisible();
   });
 

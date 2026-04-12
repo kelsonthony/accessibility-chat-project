@@ -56,6 +56,7 @@ export function AuthPanel({
   const [verificationRequestId, setVerificationRequestId] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [loginEmailError, setLoginEmailError] = useState(false);
 
   const emailsMatch =
     email.trim().length > 0 &&
@@ -114,6 +115,11 @@ export function AuthPanel({
     event.preventDefault();
 
     if (mode === 'login') {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+        setLoginEmailError(true);
+        return;
+      }
+      setLoginEmailError(false);
       await onLogin({ email, password });
       return;
     }
@@ -224,10 +230,10 @@ export function AuthPanel({
                 id="field-email"
                 type="email"
                 autoComplete="email"
-                aria-invalid={emailMismatch || undefined}
+                aria-invalid={(emailMismatch || loginEmailError) || undefined}
                 aria-describedby={mode === 'signup' ? 'hint-email' : undefined}
                 value={email}
-                onChange={(event) => setEmail(event.target.value)}
+                onChange={(event) => { setEmail(event.target.value); setLoginEmailError(false); }}
               />
             </div>
           ) : null}
@@ -484,6 +490,12 @@ export function AuthPanel({
             </button>
           </div>
         )}
+
+        {loginEmailError && mode === 'login' ? (
+          <p className="feedback error" role="alert">
+            E-mail inválido.
+          </p>
+        ) : null}
 
         {error ? (
           <p className="feedback error" role="alert">
