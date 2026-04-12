@@ -32,24 +32,26 @@ The real differentiator, however, is the **telemetry engine**: the app silently 
 
 ## 2. Production URLs
 
-| Service | URL |
-|---|---|
-| **Frontend** | https://accesschat.157-151-29-59.sslip.io | Access - evaluator@accesschat.dev / StrongPass123
-| **Backend API** | https://api-accesschat.157-151-29-59.sslip.io |
-| **Swagger / OpenAPI** | https://api-accesschat.157-151-29-59.sslip.io/api/docs |
-| **Health Check** | https://api-accesschat.157-151-29-59.sslip.io/health |
-| **Grafana** | https://grafana-accesschat.157-151-29-59.sslip.io |
-| **WhatsApp Agent** | +1 (415) 523-8886 — send `join <sandbox-keyword>` to get started |
+| Service | URL | Credentials |
+|---|---|---|
+| **Frontend** | https://accesschat.157-151-29-59.sslip.io | `evaluator@accesschat.dev` / `StrongPass123` |
+| **Backend API** | https://api-accesschat.157-151-29-59.sslip.io | — |
+| **Swagger / OpenAPI** | https://api-accesschat.157-151-29-59.sslip.io/api/docs | — |
+| **Health Check** | https://api-accesschat.157-151-29-59.sslip.io/health | — |
+| **Grafana** | https://grafana-accesschat.157-151-29-59.sslip.io | `admin` / `AccessChat@Grafana2026!` |
+| **WhatsApp Agent** | [![WhatsApp](https://img.shields.io/badge/Chat_no_WhatsApp-25D366?style=flat&logo=whatsapp&logoColor=white)](https://wa.me/14155238886) | +1 (415) 523-8886 |
 
 > All HTTPS endpoints are served with a valid Let's Encrypt certificate via cert-manager + Traefik on K3s.
 
 ### WhatsApp Agent
 
-The accessibility assistant is available on WhatsApp:
+[![Falar com o Assistente no WhatsApp](https://img.shields.io/badge/Falar_com_o_Assistente-25D366?style=for-the-badge&logo=whatsapp&logoColor=white)](https://wa.me/14155238886)
 
-1. Save **+1 (415) 523-8886** to your contacts.
-2. Send the Twilio sandbox activation message: `join <sandbox-keyword>`.
-3. Log in with your AccessChat e-mail (the bot guides the flow).
+The accessibility assistant is available on WhatsApp via Twilio Sandbox:
+
+1. Click the badge above or open **https://wa.me/14155238886** on your phone.
+2. Send the Twilio sandbox activation message: `join <sandbox-keyword>` (visible in your Twilio console under **Messaging → Try it out → Send a WhatsApp message**).
+3. Log in with your AccessChat e-mail — the bot guides the authentication flow.
 4. Ask questions about WCAG, LBI, ADA, or Section 508 directly from WhatsApp.
 
 Responses use the same RAG pipeline as the web chat.
@@ -432,13 +434,17 @@ Google login via popup without third-party libraries:
 - Backend exchanges the code via the Google OAuth 2.0 API, validates the `id_token`, creates or retrieves the user, and returns an AccessChat JWT.
 - The `client_secret` never leaves the server.
 
-### WhatsApp Integration (Meta Cloud API)
+### WhatsApp Integration (Twilio / Meta Cloud API)
 
-The accessibility assistant is available on WhatsApp:
-- Webhook at `POST /whatsapp/webhook` receives messages from the Meta Cloud API.
-- The service guides users through a conversational authentication flow (e-mail + verification code).
+[![Falar com o Assistente no WhatsApp](https://img.shields.io/badge/Abrir_conversa_no_WhatsApp-25D366?style=for-the-badge&logo=whatsapp&logoColor=white)](https://wa.me/14155238886)
+
+The accessibility assistant is available on WhatsApp at **+1 (415) 523-8886**:
+- Webhook at `POST /whatsapp/webhook` receives messages from the Twilio / Meta Cloud API.
+- The service guides users through a conversational authentication flow (e-mail + 6-digit verification code).
 - Once authenticated, every message is processed by the same `RagService.answer()` as the web chat.
-- Responses are sent back via the WhatsApp API with text-friendly formatting.
+- Greetings (e.g. "Oi", "Hello") are intercepted before the RAG call and get a friendly reply.
+- When no chunk matches the query, a helpful rephrasing prompt is returned instead of the raw fallback message.
+- Responses are sent back via the Twilio Messages API with text-friendly formatting.
 
 ### Multilingual support (pt / en / es)
 
@@ -452,18 +458,20 @@ Math challenge generated server-side with configurable TTL — no reCAPTCHA/hCap
 
 ## 8. Monitoring (Grafana + Prometheus)
 
-### URLs
+### URLs and credentials
 
-| Service | URL |
-|---|---|
-| **Grafana** | https://grafana-accesschat.157-151-29-59.sslip.io |
-| **Prometheus** | Cluster-internal only (`prometheus.accesschat:9090`) |
+| Service | URL | Login |
+|---|---|---|
+| **Grafana** | https://grafana-accesschat.157-151-29-59.sslip.io | `admin` / `AccessChat@Grafana2026!` |
+| **Prometheus** | Cluster-internal only (`prometheus.accesschat:9090`) | — |
+
+> Open Grafana → **Dashboards → AccessChat → AccessChat — API & Infrastructure** to see live API and host metrics.
 
 ### Stack
 
-- **Prometheus v2.51** — scrapes backend (`:3001/metrics`), frontend (`:3003/metrics`), Traefik (`:8082/metrics`), and Node Exporter (host metrics).
-- **Grafana v10.4** — dashboards auto-provisioned via ConfigMap; local auth.
-- **Node Exporter** — Oracle Cloud host metrics: CPU, memory, disk, network.
+- **Prometheus v2.51** — scrapes backend (`:4001/metrics`), Traefik (`:9100/metrics`), and Node Exporter (host metrics).
+- **Grafana v10.4** — 18-panel dashboard auto-provisioned via ConfigMap; local auth only.
+- **Node Exporter** — Oracle Cloud host metrics: CPU, memory, disk, network I/O.
 
 ### Deploy monitoring
 
