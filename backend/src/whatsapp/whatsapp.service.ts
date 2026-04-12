@@ -244,10 +244,30 @@ export class WhatsappService {
     }
 
     if (session.authState === 'authenticated' && session.userId) {
+      if (isGreeting(normalizedText)) {
+        const name = session.profileName ? `, ${session.profileName.split(' ')[0]}` : '';
+        const greetings: Record<string, string> = {
+          pt: `Ola${name}! Como posso ajudar com acessibilidade hoje? Pode me fazer uma pergunta sobre WCAG, LBI, ARIA ou qualquer tema de acessibilidade digital.`,
+          en: `Hello${name}! How can I help with accessibility today? Feel free to ask about WCAG, ADA, ARIA, or any digital accessibility topic.`,
+          es: `Hola${name}! Como puedo ayudarte con accesibilidad hoy? Puedes preguntarme sobre WCAG, ARIA o cualquier tema de accesibilidad digital.`,
+        };
+        return greetings[session.preferredLanguage || 'pt'];
+      }
+
       const answer = await this.ragService.answer(session.userId, {
         question: text,
         language: session.preferredLanguage,
       });
+
+      if (answer.mode === 'fallback') {
+        const noMatch: Record<string, string> = {
+          pt: `Nao encontrei uma resposta especifica para "${text.slice(0, 60)}". Tente uma pergunta mais detalhada sobre acessibilidade digital, como: "O que e WCAG 2.2?" ou "Como implementar ARIA em formularios?"`,
+          en: `I couldn't find a specific answer for "${text.slice(0, 60)}". Try a more detailed accessibility question, e.g. "What is WCAG 2.2?" or "How do I add ARIA to forms?"`,
+          es: `No encontre una respuesta especifica para "${text.slice(0, 60)}". Intenta una pregunta mas detallada, como: "Que es WCAG 2.2?" o "Como usar ARIA en formularios?"`,
+        };
+        return noMatch[answer.language || session.preferredLanguage || 'pt'];
+      }
+
       return buildWhatsappReply(answer.answer);
     }
 
@@ -638,4 +658,16 @@ function normalizeLanguage(value?: string | null): SupportedLanguage | undefined
     return value;
   }
   return undefined;
+}
+
+function isGreeting(normalizedText: string): boolean {
+  const greetings = [
+    'oi', 'ola', 'hey', 'hi', 'hello', 'hola',
+    'bom-dia', 'boa-tarde', 'boa-noite',
+    'good-morning', 'good-afternoon', 'good-evening', 'good-night',
+    'buenos-dias', 'buenas-tardes', 'buenas-noches',
+    'tudo-bem', 'tudo-bom', 'como-vai', 'e-ai', 'e-aí',
+    'oi-oi', 'ola-ola',
+  ];
+  return greetings.includes(normalizedText) || normalizedText.length < 3;
 }
