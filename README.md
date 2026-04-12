@@ -34,11 +34,11 @@ The real differentiator, however, is the **telemetry engine**: the app silently 
 
 | Service | URL | Credentials |
 |---|---|---|
-| **Frontend** | https://accesschat.157-151-29-59.sslip.io | `evaluator@accesschat.dev` / `StrongPass123` |
-| **Backend API** | https://api-accesschat.157-151-29-59.sslip.io | — |
-| **Swagger / OpenAPI** | https://api-accesschat.157-151-29-59.sslip.io/api/docs | — |
-| **Health Check** | https://api-accesschat.157-151-29-59.sslip.io/health | — |
-| **Grafana** | https://grafana-accesschat.157-151-29-59.sslip.io | `admin` / `AccessChat@Grafana2026!` |
+| **Frontend** | https://accesschat.157-151-29-59.sslip.io 
+| **Backend API** | https://api-accesschat.157-151-29-59.sslip.io
+| **Swagger / OpenAPI** | https://api-accesschat.157-151-29-59.sslip.io/api/docs
+| **Health Check** | https://api-accesschat.157-151-29-59.sslip.io/health
+| **Grafana** | https://grafana-accesschat.157-151-29-59.sslip.io
 | **WhatsApp Agent** | [![WhatsApp](https://img.shields.io/badge/Chat_no_WhatsApp-25D366?style=flat&logo=whatsapp&logoColor=white)](https://wa.me/14155238886) | +1 (415) 523-8886 |
 
 > All HTTPS endpoints are served with a valid Let's Encrypt certificate via cert-manager + Traefik on K3s.
