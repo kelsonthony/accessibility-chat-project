@@ -60,65 +60,104 @@ function scoreRow(
 
   let score = 0;
 
+  // Base scoring for term matches
   for (const term of terms) {
+    // Skip common question words that don't add value
+    if (['what', 'how', 'why', 'when', 'where', 'tell', 'about', 'the', 'is', 'are'].includes(term)) {
+      continue;
+    }
+
     if (title.includes(term)) score += 7;
     if (section.includes(term)) score += 5;
     if (content.includes(term)) score += 3;
   }
 
+  // Language preference
   if (row.language === language) {
     score += 4;
   }
 
+  // Jurisdiction preference
   if (jurisdictions.includes(row.jurisdiction)) {
     score += row.jurisdiction === 'GLOBAL' ? 1 : 5;
   }
 
+  // Penalize GLOBAL sources when specific jurisdiction is requested
   if (row.jurisdiction === 'GLOBAL' && jurisdictions.some((jurisdiction) => jurisdiction !== 'GLOBAL')) {
     score -= 6;
   }
 
-  if (row.source_key === 'lbi' && terms.some((term) => ['brasil', 'lbi', 'lei', 'acessibilidade'].includes(term))) {
-    score += 4;
+  // Source-specific boosts (IMPROVED - more aggressive matching)
+  if (row.source_key === 'lbi') {
+    if (terms.some((term) => ['lbi', 'brasil', 'brasileira'].includes(term))) {
+      score += 20; // Strong boost for direct LBI mention
+    }
+    if (terms.some((term) => ['lei', 'acessibilidade', 'inclusao'].includes(term))) {
+      score += 8;
+    }
   }
 
-  if (
-    row.source_key === 'hand_talk' &&
-    terms.some((term) =>
-      ['hand', 'talk', 'sorenson', 'gifted', 'citizen', 'banco', 'interamericano', 'bid', 'startup', 'inovadora'].includes(term),
-    )
-  ) {
-    score += 12;
+  if (row.source_key === 'hand_talk') {
+    if (terms.some((term) => ['hand', 'talk'].includes(term))) {
+      score += 20;
+    }
+    if (terms.some((term) => ['sorenson', 'gifted', 'citizen', 'banco', 'interamericano', 'bid', 'startup'].includes(term))) {
+      score += 12;
+    }
   }
 
-  if (row.source_key === 'wcag_2_2' && terms.some((term) => ['wcag', 'keyboard', 'contrast'].includes(term))) {
-    score += 4;
+  if (row.source_key === 'ada') {
+    if (terms.some((term) => ['ada', 'americans', 'disabilities'].includes(term))) {
+      score += 20; // Strong boost for direct ADA mention
+    }
+    if (terms.some((term) => ['public', 'business', 'accommodation', 'checkout', 'title'].includes(term))) {
+      score += 8;
+    }
   }
 
-  if (
-    row.source_key === 'en_301_549' &&
-    terms.some((term) => ['europa', 'europe', 'european', 'en', '301', '549', 'kiosk', 'terminal'].includes(term))
-  ) {
-    score += 6;
+  if (row.source_key === 'section_508') {
+    if (terms.some((term) => ['508', 'section'].includes(term))) {
+      score += 20; // Strong boost for direct Section 508 mention
+    }
+    if (terms.some((term) => ['federal', 'procurement', 'agency', 'software', 'government'].includes(term))) {
+      score += 8;
+    }
   }
 
-  if (row.source_key === 'eaa' && terms.some((term) => ['eaa', 'directive', 'service', 'terminal', 'market'].includes(term))) {
-    score += 6;
+  if (row.source_key === 'wcag_2_2') {
+    if (terms.some((term) => ['wcag', 'w3c'].includes(term))) {
+      score += 15;
+    }
+    if (terms.some((term) => ['guideline', 'keyboard', 'contrast', 'aria', 'perceivable', 'operable'].includes(term))) {
+      score += 6;
+    }
   }
 
-  if (row.source_key === 'ada' && terms.some((term) => ['ada', 'public', 'business', 'accommodation', 'checkout'].includes(term))) {
-    score += 6;
+  if (row.source_key === 'en_301_549') {
+    if (terms.some((term) => ['301', '549', 'en'].includes(term))) {
+      score += 20;
+    }
+    if (terms.some((term) => ['europa', 'europe', 'european', 'kiosk', 'terminal', 'etsi'].includes(term))) {
+      score += 8;
+    }
   }
 
-  if (
-    row.source_key === 'section_508' &&
-    terms.some((term) => ['508', 'federal', 'procurement', 'agency', 'software'].includes(term))
-  ) {
-    score += 12;
+  if (row.source_key === 'eaa') {
+    if (terms.some((term) => ['eaa', 'european', 'accessibility', 'act'].includes(term))) {
+      score += 18;
+    }
+    if (terms.some((term) => ['directive', 'service', 'terminal', 'market', 'product'].includes(term))) {
+      score += 6;
+    }
   }
 
-  if (row.source_key === 'un_crpd' && terms.some((term) => ['crpd', 'rights', 'un', 'convention', 'inclusion'].includes(term))) {
-    score += 4;
+  if (row.source_key === 'un_crpd') {
+    if (terms.some((term) => ['crpd', 'un', 'convention'].includes(term))) {
+      score += 18;
+    }
+    if (terms.some((term) => ['rights', 'united', 'nations', 'inclusion', 'disability'].includes(term))) {
+      score += 6;
+    }
   }
 
   return score;

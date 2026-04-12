@@ -51,6 +51,13 @@ export async function login(input: LoginInput): Promise<AuthResponse> {
   });
 }
 
+export async function googleAuth(code: string, redirectUri: string): Promise<AuthResponse> {
+  return request<AuthResponse>('/auth/google', {
+    method: 'POST',
+    body: JSON.stringify({ code, redirectUri }),
+  });
+}
+
 export async function forgotPassword(
   input: ForgotPasswordInput,
 ): Promise<PasswordResetRequestResponse> {

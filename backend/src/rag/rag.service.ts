@@ -60,10 +60,20 @@ export class RagService {
         lower(dc.content) like any($1::text[])
         or lower(dc.section) like any($1::text[])
         or lower(d.title) like any($1::text[])
+        or lower(d.source_key) like any($1::text[])
       )
+      order by
+        -- Prioritize exact source_key matches
+        case when lower(d.source_key) = any($3::text[]) then 1 else 2 end,
+        -- Then by title matches
+        case when lower(d.title) like any($1::text[]) then 1 else 2 end
       limit 120
       `,
-      [terms.map((term) => `%${term}%`), jurisdictions],
+      [
+        terms.map((term) => `%${term}%`),
+        jurisdictions,
+        terms, // exact match for source_key
+      ],
     );
 
     const rankedRows = rankCandidates(result.rows, terms, language, jurisdictions);
@@ -148,11 +158,20 @@ export class RagService {
 }
 
 function tokenize(question: string) {
+  const importantAcronyms = ['ada', 'lbi', 'eu', 'us', 'br', 'un', 'en', 'eaa'];
+
   return question
     .toLowerCase()
     .replace(/[^a-z0-9à-ÿ\s]/gi, ' ')
     .split(/\s+/)
-    .filter((term) => term.length >= 3)
+    .filter((term) => {
+      // Keep important acronyms even if they're short
+      if (importantAcronyms.includes(term)) {
+        return true;
+      }
+      // Keep terms with 3+ characters
+      return term.length >= 3;
+    })
     .slice(0, 12);
 }
 

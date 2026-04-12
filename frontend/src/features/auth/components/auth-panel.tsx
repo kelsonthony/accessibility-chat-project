@@ -25,7 +25,7 @@ interface AuthPanelProps {
   onVerifySignup: (input: VerifySignupInput) => Promise<void>;
   onForgotPassword: (input: ForgotPasswordInput) => Promise<PasswordResetRequestResponse>;
   onResetPassword: (input: ResetPasswordInput) => Promise<void>;
-  onSocialAuth: (provider: 'google' | 'github') => Promise<void>;
+  onGoogleAuth: () => Promise<void>;
   isPending: boolean;
   error: string | null;
   successMessage: string | null;
@@ -40,17 +40,17 @@ export function AuthPanel({
   onVerifySignup,
   onForgotPassword,
   onResetPassword,
-  onSocialAuth,
+  onGoogleAuth,
   isPending,
   error,
   successMessage,
 }: AuthPanelProps) {
   const [mode, setMode] = useState<AuthMode>('login');
-  const [displayName, setDisplayName] = useState('Accessibility Analyst');
-  const [email, setEmail] = useState('evaluator@accesschat.dev');
-  const [confirmEmail, setConfirmEmail] = useState('evaluator@accesschat.dev');
-  const [password, setPassword] = useState('StrongPass123');
-  const [confirmPassword, setConfirmPassword] = useState('StrongPass123');
+  const [displayName, setDisplayName] = useState('');
+  const [email, setEmail] = useState('');
+  const [confirmEmail, setConfirmEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [code, setCode] = useState('');
   const [captchaAnswer, setCaptchaAnswer] = useState('');
   const [verificationRequestId, setVerificationRequestId] = useState('');
@@ -186,7 +186,7 @@ export function AuthPanel({
         </div>
 
         {mode === 'login' || mode === 'signup' ? (
-          <div className="segmented-control" role="tablist" aria-label="Authentication mode">
+          <div className="segmented-control" role="group" aria-label="Modo de autenticação">
             {([
               ['login', 'Entrar'],
               ['signup', 'Criar conta'],
@@ -204,42 +204,57 @@ export function AuthPanel({
           </div>
         ) : null}
 
-        <form className="stack" onSubmit={handleSubmit}>
+        <form className="stack" onSubmit={handleSubmit} noValidate>
           {mode === 'signup' ? (
-            <label className="field">
-              <span>Nome</span>
-              <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
-            </label>
+            <div className="field">
+              <label htmlFor="field-display-name">Nome</label>
+              <input
+                id="field-display-name"
+                autoComplete="name"
+                value={displayName}
+                onChange={(event) => setDisplayName(event.target.value)}
+              />
+            </div>
           ) : null}
 
           {mode !== 'verify' ? (
-            <label className="field">
-              <span>Email</span>
+            <div className="field">
+              <label htmlFor="field-email">Email</label>
               <input
+                id="field-email"
                 type="email"
                 autoComplete="email"
+                aria-invalid={emailMismatch || undefined}
+                aria-describedby={mode === 'signup' ? 'hint-email' : undefined}
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
               />
-            </label>
+            </div>
           ) : null}
 
           {mode === 'signup' ? (
             <>
-              <label className="field">
-                <span>Confirmar email</span>
+              <div className="field">
+                <label htmlFor="field-confirm-email">Confirmar email</label>
                 <input
+                  id="field-confirm-email"
                   type="email"
                   autoComplete="email"
+                  aria-invalid={emailMismatch || undefined}
+                  aria-describedby="hint-email"
                   value={confirmEmail}
                   onChange={(event) => setConfirmEmail(event.target.value)}
                 />
-              </label>
-              <p className={`field-hint ${emailsMatch ? 'ok' : emailMismatch ? 'error' : ''}`}>
+              </div>
+              <p
+                id="hint-email"
+                className={`field-hint ${emailsMatch ? 'ok' : emailMismatch ? 'error' : ''}`}
+                aria-live="polite"
+              >
                 {emailsMatch
                   ? 'Os emails conferem.'
                   : emailMismatch
-                    ? 'Os emails sao diferentes.'
+                    ? 'Os emails são diferentes.'
                     : 'Confirme o mesmo email para continuar.'}
               </p>
             </>
@@ -247,12 +262,14 @@ export function AuthPanel({
 
           {mode === 'login' || mode === 'signup' || mode === 'reset' ? (
             <>
-              <label className="field">
-                <span>Senha</span>
+              <div className="field">
+                <label htmlFor="field-password">Senha</label>
                 <div className="password-input-wrap">
                   <input
+                    id="field-password"
                     type={showPassword ? 'text' : 'password'}
                     autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                    aria-describedby={mode !== 'login' ? 'hint-password' : undefined}
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
                   />
@@ -266,19 +283,44 @@ export function AuthPanel({
                     {showPassword ? 'Ocultar' : 'Mostrar'}
                   </button>
                 </div>
-              </label>
+              </div>
               {mode === 'signup' || mode === 'reset' ? (
-                <div className="password-rules" aria-live="polite">
+                <div id="hint-password" className="password-rules" aria-live="polite">
                   <p className="field-hint">
                     A senha precisa ter no mínimo 12 caracteres, letras maiúsculas e minúsculas,
                     números e caractere especial.
                   </p>
-                  <ul className="password-checklist">
-                    <li className={passwordChecks.minLength ? 'ok' : ''}>12 caracteres ou mais</li>
-                    <li className={passwordChecks.upper ? 'ok' : ''}>Uma letra maiuscula</li>
-                    <li className={passwordChecks.lower ? 'ok' : ''}>Uma letra minuscula</li>
-                    <li className={passwordChecks.number ? 'ok' : ''}>Um numero</li>
-                    <li className={passwordChecks.special ? 'ok' : ''}>Um caractere especial</li>
+                  <ul className="password-checklist" aria-label="Requisitos de senha">
+                    <li
+                      className={passwordChecks.minLength ? 'ok' : ''}
+                      aria-label={`12 caracteres ou mais: ${passwordChecks.minLength ? 'atendido' : 'pendente'}`}
+                    >
+                      12 caracteres ou mais
+                    </li>
+                    <li
+                      className={passwordChecks.upper ? 'ok' : ''}
+                      aria-label={`Uma letra maiúscula: ${passwordChecks.upper ? 'atendido' : 'pendente'}`}
+                    >
+                      Uma letra maiúscula
+                    </li>
+                    <li
+                      className={passwordChecks.lower ? 'ok' : ''}
+                      aria-label={`Uma letra minúscula: ${passwordChecks.lower ? 'atendido' : 'pendente'}`}
+                    >
+                      Uma letra minúscula
+                    </li>
+                    <li
+                      className={passwordChecks.number ? 'ok' : ''}
+                      aria-label={`Um número: ${passwordChecks.number ? 'atendido' : 'pendente'}`}
+                    >
+                      Um número
+                    </li>
+                    <li
+                      className={passwordChecks.special ? 'ok' : ''}
+                      aria-label={`Um caractere especial: ${passwordChecks.special ? 'atendido' : 'pendente'}`}
+                    >
+                      Um caractere especial
+                    </li>
                   </ul>
                 </div>
               ) : null}
@@ -287,74 +329,87 @@ export function AuthPanel({
 
           {mode === 'signup' || mode === 'reset' ? (
             <>
-              <label className="field">
-                <span>Confirmar senha</span>
+              <div className="field">
+                <label htmlFor="field-confirm-password">Confirmar senha</label>
                 <div className="password-input-wrap">
                   <input
+                    id="field-confirm-password"
                     type={showConfirmPassword ? 'text' : 'password'}
                     autoComplete="new-password"
+                    aria-invalid={passwordMismatch || undefined}
+                    aria-describedby="hint-confirm-password"
                     value={confirmPassword}
                     onChange={(event) => setConfirmPassword(event.target.value)}
                   />
                   <button
                     type="button"
                     className="password-visibility-toggle"
-                    aria-label={showConfirmPassword ? 'Ocultar confirmacao de senha' : 'Mostrar confirmacao de senha'}
+                    aria-label={showConfirmPassword ? 'Ocultar confirmação de senha' : 'Mostrar confirmação de senha'}
                     aria-pressed={showConfirmPassword}
                     onClick={() => setShowConfirmPassword((value) => !value)}
                   >
                     {showConfirmPassword ? 'Ocultar' : 'Mostrar'}
                   </button>
                 </div>
-              </label>
+              </div>
               <p
+                id="hint-confirm-password"
                 className={`field-hint ${
                   passwordsMatch ? 'ok' : passwordMismatch || (confirmPassword && !passwordStrong) ? 'error' : ''
                 }`}
+                aria-live="polite"
               >
                 {passwordsMatch && passwordStrong
                   ? 'As senhas conferem.'
                   : passwordMismatch
-                    ? 'As senhas sao diferentes.'
+                    ? 'As senhas são diferentes.'
                     : confirmPassword && !passwordStrong
-                      ? 'A senha ainda nao atende aos requisitos minimos.'
+                      ? 'A senha ainda não atende aos requisitos mínimos.'
                       : 'Confirme a mesma senha para continuar.'}
               </p>
             </>
           ) : null}
 
           {mode === 'verify' || mode === 'reset' ? (
-            <label className="field">
-              <span>Codigo</span>
+            <div className="field">
+              <label htmlFor="field-code">Código de verificação</label>
               <input
+                id="field-code"
                 inputMode="numeric"
                 maxLength={6}
+                autoComplete="one-time-code"
+                aria-describedby="hint-code"
                 value={code}
                 onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
               />
-            </label>
+              <p id="hint-code" className="field-hint">
+                Digite o código de 6 dígitos enviado para seu email.
+              </p>
+            </div>
           ) : null}
 
           {mode === 'signup' || mode === 'forgot' ? (
-            <div className="captcha-card">
+            <div className="captcha-card" role="group" aria-label="Verificação de segurança">
               <div className="captcha-header">
-                <strong>{captcha?.prompt || captchaError || 'Carregando captcha...'}</strong>
+                <strong aria-live="polite">{captcha?.prompt || captchaError || 'Carregando captcha...'}</strong>
                 <button
                   type="button"
                   className="ghost-button captcha-refresh"
+                  aria-label="Atualizar desafio do captcha"
                   onClick={() => void onRefreshCaptcha()}
                 >
                   Atualizar
                 </button>
               </div>
-              <label className="field">
-                <span>Resposta do captcha</span>
+              <div className="field">
+                <label htmlFor="field-captcha">Resposta do captcha</label>
                 <input
+                  id="field-captcha"
                   inputMode="numeric"
                   value={captchaAnswer}
                   onChange={(event) => setCaptchaAnswer(event.target.value)}
                 />
-              </label>
+              </div>
             </div>
           ) : null}
 
@@ -391,7 +446,7 @@ export function AuthPanel({
               <button
                 type="button"
                 className="social-button"
-                onClick={() => onSocialAuth('google')}
+                onClick={() => void onGoogleAuth()}
                 disabled={isPending}
               >
                 <span className="social-icon" aria-hidden="true">
@@ -415,22 +470,6 @@ export function AuthPanel({
                   </svg>
                 </span>
                 Continuar com Google
-              </button>
-              <button
-                type="button"
-                className="social-button"
-                onClick={() => onSocialAuth('github')}
-                disabled={isPending}
-              >
-                <span className="social-icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" role="presentation">
-                    <path
-                      fill="currentColor"
-                      d="M12 .5C5.65.5.5 5.74.5 12.22c0 5.18 3.3 9.57 7.88 11.12.58.11.79-.26.79-.57 0-.28-.01-1.2-.02-2.18-3.2.71-3.88-1.39-3.88-1.39-.52-1.36-1.28-1.72-1.28-1.72-1.05-.73.08-.72.08-.72 1.16.08 1.76 1.22 1.76 1.22 1.03 1.81 2.7 1.29 3.36.99.1-.77.4-1.29.72-1.59-2.55-.3-5.23-1.31-5.23-5.84 0-1.29.45-2.35 1.19-3.18-.12-.3-.52-1.5.11-3.13 0 0 .97-.32 3.19 1.21a10.8 10.8 0 0 1 5.8 0c2.21-1.53 3.18-1.21 3.18-1.21.63 1.63.23 2.83.11 3.13.74.83 1.19 1.89 1.19 3.18 0 4.54-2.68 5.53-5.24 5.83.41.36.77 1.07.77 2.15 0 1.56-.01 2.82-.01 3.21 0 .31.21.69.8.57A11.74 11.74 0 0 0 23.5 12.22C23.5 5.74 18.35.5 12 .5Z"
-                    />
-                  </svg>
-                </span>
-                Continuar com GitHub
               </button>
             </div>
           </>

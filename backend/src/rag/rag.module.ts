@@ -11,5 +11,6 @@ import { RagService } from './rag.service';
   imports: [AuthModule, UsersModule, DatabaseModule],
   controllers: [RagController],
   providers: [RagService, LlmService],
+  exports: [RagService],
 })
 export class RagModule {}

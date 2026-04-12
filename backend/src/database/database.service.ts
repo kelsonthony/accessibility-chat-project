@@ -138,6 +138,72 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
 
       create index if not exists password_reset_requests_email_idx
       on accesschat.password_reset_requests(email, created_at desc);
+
+      create table if not exists accesschat.whatsapp_contacts (
+        phone_number text primary key,
+        user_id uuid references accesschat.users(id) on delete cascade,
+        profile_name text,
+        email text,
+        auth_state text not null default 'awaiting_name',
+        verification_request_id uuid,
+        created_at timestamptz not null default now(),
+        last_message_at timestamptz not null default now()
+      );
+
+      create index if not exists whatsapp_contacts_user_id_idx
+      on accesschat.whatsapp_contacts(user_id);
+
+      create table if not exists accesschat.whatsapp_inbound_messages (
+        message_id text primary key,
+        phone_number text not null,
+        profile_name text,
+        text_body text not null,
+        payload jsonb not null default '{}'::jsonb,
+        response_text text,
+        error_text text,
+        received_at timestamptz not null default now(),
+        processed_at timestamptz
+      );
+
+      create index if not exists whatsapp_inbound_messages_phone_number_idx
+      on accesschat.whatsapp_inbound_messages(phone_number, received_at desc);
+
+      create table if not exists accesschat.whatsapp_status_events (
+        id uuid primary key,
+        message_sid text not null,
+        message_status text not null,
+        to_number text,
+        from_number text,
+        channel_status text,
+        error_code text,
+        error_message text,
+        raw_payload jsonb not null default '{}'::jsonb,
+        received_at timestamptz not null default now()
+      );
+
+      create index if not exists whatsapp_status_events_message_sid_idx
+      on accesschat.whatsapp_status_events(message_sid, received_at desc);
+
+      alter table accesschat.whatsapp_contacts add column if not exists email text;
+      alter table accesschat.whatsapp_contacts add column if not exists auth_state text not null default 'awaiting_name';
+      alter table accesschat.whatsapp_contacts add column if not exists verification_request_id uuid;
+      alter table accesschat.whatsapp_contacts add column if not exists preferred_language text;
+      alter table accesschat.whatsapp_contacts alter column user_id drop not null;
+
+      create table if not exists accesschat.whatsapp_auth_requests (
+        id uuid primary key,
+        phone_number text not null,
+        email text not null,
+        display_name text not null,
+        code_hash text not null,
+        expires_at timestamptz not null,
+        attempts integer not null default 0,
+        consumed_at timestamptz,
+        created_at timestamptz not null default now()
+      );
+
+      create index if not exists whatsapp_auth_requests_phone_number_idx
+      on accesschat.whatsapp_auth_requests(phone_number, created_at desc);
     `);
     this.logger.log('Database schema is ready.');
   }

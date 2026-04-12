@@ -1,0 +1,85 @@
+# Ingress — namespace: kelsontocompile
+# Web:    https://kcomp.157-151-29-59.sslip.io
+# API:    https://api-kcomp.157-151-29-59.sslip.io
+# Worker: https://worker-kcomp.157-151-29-59.sslip.io
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kcomp-web
+  namespace: kelsontocompile
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
+    traefik.ingress.kubernetes.io/router.middlewares: default-redirect-https@kubernetescrd
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - kcomp.157-151-29-59.sslip.io
+      secretName: kcomp-web-tls
+  rules:
+    - host: kcomp.157-151-29-59.sslip.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: kcomp-web
+                port:
+                  number: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kcomp-api
+  namespace: kelsontocompile
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
+    traefik.ingress.kubernetes.io/router.middlewares: default-redirect-https@kubernetescrd
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - api-kcomp.157-151-29-59.sslip.io
+      secretName: kcomp-api-tls
+  rules:
+    - host: api-kcomp.157-151-29-59.sslip.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: kcomp-api
+                port:
+                  number: 4000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kcomp-worker
+  namespace: kelsontocompile
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
+    traefik.ingress.kubernetes.io/router.middlewares: default-redirect-https@kubernetescrd
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - worker-kcomp.157-151-29-59.sslip.io
+      secretName: kcomp-worker-tls
+  rules:
+    - host: worker-kcomp.157-151-29-59.sslip.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: kcomp-worker
+                port:
+                  number: 4010

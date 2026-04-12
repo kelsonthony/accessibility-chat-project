@@ -18,4 +18,3 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/backend/dist ./backend/dist
 COPY backend/package.json ./backend/package.json
 CMD ["node", "backend/dist/main.js"]
-
