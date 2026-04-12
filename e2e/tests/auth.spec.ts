@@ -47,8 +47,8 @@ test.describe('Authentication', () => {
     await emailInput.fill('invalid-email');
     await passwordInput.fill('pass');
 
-    // Look for submit button
-    const submitBtn = page.getByRole('button', { name: /entrar|login|sign in/i }).first();
+    // Target the submit button specifically (not the tab button which also says "Entrar")
+    const submitBtn = page.locator('button[type="submit"].auth-submit');
     await submitBtn.click();
 
     // Either inline validation or error message should be visible
