@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 
 import { AuthGuard } from '../common/guards/auth.guard';
+import { USER_REPOSITORY } from '../identity/domain/repositories/user.repository.interface';
+import { PostgresUserRepository } from '../identity/infra/persistence/postgres/user.repository';
 import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
@@ -40,7 +42,10 @@ import { resolveJwtSecurityConfig } from './jwt-key.util';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtKeyService, AuthGuard, CaptchaService, EmailService],
-  exports: [AuthService, JwtKeyService, AuthGuard, CaptchaService, EmailService],
+  providers: [
+    AuthService, JwtKeyService, AuthGuard, CaptchaService, EmailService,
+    { provide: USER_REPOSITORY, useClass: PostgresUserRepository },
+  ],
+  exports: [AuthService, JwtKeyService, AuthGuard, CaptchaService, EmailService, USER_REPOSITORY],
 })
 export class AuthModule {}
