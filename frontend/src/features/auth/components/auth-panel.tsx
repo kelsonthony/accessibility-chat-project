@@ -491,6 +491,12 @@ export function AuthPanel({
           </div>
         )}
 
+        {loginEmailError && mode === 'login' ? (
+          <p className="feedback error" role="alert">
+            E-mail inválido.
+          </p>
+        ) : null}
+
         {error ? (
           <p className="feedback error" role="alert">
             {error}
