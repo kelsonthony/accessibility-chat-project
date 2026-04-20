@@ -10,13 +10,13 @@
     "test": "node --test --experimental-strip-types test/**/*.spec.ts"
   },
   "dependencies": {
-    "@nestjs/common": "^11.0.1",
-    "@nestjs/core": "^11.0.1",
+    "@nestjs/common": "^11.1.19",
+    "@nestjs/core": "^11.1.19",
     "@nestjs/jwt": "^11.0.0",
-    "@nestjs/platform-express": "^11.0.1",
-    "@nestjs/platform-ws": "^11.0.1",
-    "@nestjs/swagger": "^8.1.1",
-    "@nestjs/websockets": "^11.0.1",
+    "@nestjs/platform-express": "^11.1.19",
+    "@nestjs/platform-ws": "^11.1.19",
+    "@nestjs/swagger": "^11.3.0",
+    "@nestjs/websockets": "^11.1.19",
     "@types/pg": "^8.20.0",
     "bcryptjs": "^3.0.2",
     "class-transformer": "^0.5.1",
@@ -29,9 +29,9 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
-    "@nestjs/cli": "^11.0.0",
-    "@nestjs/schematics": "^11.0.0",
-    "@nestjs/testing": "^11.0.1",
+    "@nestjs/cli": "^11.0.21",
+    "@nestjs/schematics": "^11.1.0",
+    "@nestjs/testing": "^11.1.19",
     "@types/node": "^24.0.0",
     "@types/ws": "^8.5.13",
     "typescript": "^5.8.3"
